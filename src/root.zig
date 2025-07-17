@@ -7,4 +7,8 @@ test {
 
     const nestle = @import("nestle.zig");
     std.testing.refAllDecls(nestle);
+
+    // Additional modules that are not public domain.
+    const sbl = @import("sbl.zig");
+    std.testing.refAllDecls(sbl);
 }
