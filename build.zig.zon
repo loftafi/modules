@@ -1,0 +1,21 @@
+.{
+    .name = .modules,
+    .version = "0.0.1",
+    .fingerprint = 0x2eb743d7876c4857,
+    .minimum_zig_version = "0.14.1",
+    .dependencies = .{
+        .praxis = .{
+            .url = "git+https://github.com/loftafi/praxis.git#6dec699c955834bb8dbb89a260ca9e3b0b2d8340",
+            .hash = "praxis-0.0.10-FPf2Nb-yBABWqCtHxfotsiIGoJizqyJWJCPhsSaIx5Ko",
+            //.path = "../praxis",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        // For example...
+        //"LICENSE",
+        "README.md",
+    },
+}
