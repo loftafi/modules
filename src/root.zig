@@ -7,7 +7,4 @@ test {
 
     const nestle = @import("nestle.zig");
     std.testing.refAllDecls(nestle);
-
-    const sbl = @import("sbl.zig");
-    std.testing.refAllDecls(sbl);
 }

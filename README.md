@@ -5,10 +5,11 @@ of Biblical Greek resources and associated literature in a standardised
 condensed binary format suitable for medium to high powered mobile
 devices.
 
-This github repository has two branches. The `master` branch contains
-resources that have a licence that dedicates the resources into the
-public domain. The `restricted` branch contains resources with licenses
-that impose restrictions on reuse and distribution such as the CC BY 4.0.
+This github repository has two branches. The [master](https://github.com/loftafi/modules/tree/master/resources)
+branch contains resources that have a licence that dedicates the resources
+into the public domain. The [restricted](https://github.com/loftafi/modules/tree/restricted/resources)
+branch contains resources with licenses that impose restrictions on reuse
+and distribution such as the CC BY 4.0.
 
 ### Design
 
