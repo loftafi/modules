@@ -39,6 +39,10 @@ pub fn reader() type {
         pub fn reference(self: *Self) praxis.Reference {
             return self.parser.reference;
         }
+
+        pub fn debug_slice(self: *Self) []const u8 {
+            return self.parser.debug_slice();
+        }
     };
 }
 

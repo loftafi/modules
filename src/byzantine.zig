@@ -10,22 +10,38 @@ pub const files = [_][]const u8{
 pub fn reader() type {
     return struct {
         const Self = @This();
-        data: []u8,
         parser: ByzParser,
-        files_index: usize,
+        data: []u8,
+        parser2: ByzParser,
+        data2: []u8,
+        files_index: usize = 0,
+        carryover_token: TextToken = .unknown,
+        verbose: bool = false,
 
         pub fn init(allocator: Allocator) !Self {
             var buf: [50]u8 = undefined;
             const dir = try std.fs.cwd().openDir(folder, .{});
-            const filename = try std.fmt.bufPrint(&buf, "{s}.BP5", .{files[0]});
+
+            var filename = try bufPrint(&buf, "{s}.BP5", .{files[0]});
             const data = try load_file_bytes(allocator, dir, filename);
             var parser = ByzParser.init(data);
             parser.reference.module = .byzantine;
             parser.reference.book = extract_book_from_filename(files[0]);
+
+            filename = try bufPrint(&buf, "{s}.TXT", .{files[0]});
+            const data2 = try load_file_bytes(allocator, dir, filename);
+            var parser2 = ByzParser.init(data2);
+            parser2.reference.module = .byzantine;
+            parser2.reference.book = extract_book_from_filename(files[0]);
+
             return .{
                 .data = data,
                 .parser = parser,
+                .data2 = data2,
+                .parser2 = parser2,
                 .files_index = 0,
+                .carryover_token = .unknown,
+                .verbose = false,
             };
         }
 
@@ -41,25 +57,119 @@ pub fn reader() type {
             return self.parser.word;
         }
 
+        // Read parser2 tokens for paragraph and accentation,
+        // supplimented by parser1 tokens for parsing data.
         pub fn next(self: *Self, allocator: Allocator) !TextToken {
-            var token = try self.parser.next();
+            var token: TextToken = .unknown;
 
-            if (token != .eof) return token;
-            if (self.files_index >= files.len) return token;
+            if (self.carryover_token != .unknown) {
+                token = self.carryover_token;
+                self.carryover_token = .unknown;
+                if (self.verbose)
+                    debug("using the holdback BP5({s} {s})", .{
+                        @tagName(token),
+                        self.parser.value,
+                    });
+            } else {
+                token = try self.parser.next();
+            }
 
-            var buf: [50]u8 = undefined;
-            const dir = try std.fs.cwd().openDir(folder, .{});
-            allocator.free(self.data);
-            self.parser.reference.book = extract_book_from_filename(
-                files[self.files_index],
-            );
-            const filename = try std.fmt.bufPrint(&buf, "{s}.BP5", .{
-                files[self.files_index],
-            });
-            self.data = try load_file_bytes(allocator, dir, filename);
-            self.parser = ByzParser.init(self.data);
-            token = try self.parser.next();
-            self.files_index += 1;
+            if (token == .eof) {
+                if (self.files_index >= files.len) return token;
+
+                var buf: [50]u8 = undefined;
+                const dir = try std.fs.cwd().openDir(folder, .{});
+                allocator.free(self.data);
+                self.parser.reference.book = extract_book_from_filename(
+                    files[self.files_index],
+                );
+
+                var filename = try bufPrint(&buf, "{s}.BP5", .{
+                    files[self.files_index],
+                });
+                self.data = try load_file_bytes(allocator, dir, filename);
+                self.parser = ByzParser.init(self.data);
+
+                filename = try bufPrint(&buf, "{s}.TXT", .{
+                    files[self.files_index],
+                });
+                self.data2 = try load_file_bytes(allocator, dir, filename);
+                self.parser2 = ByzParser.init(self.data2);
+
+                self.files_index += 1;
+                token = try self.parser.next();
+            }
+
+            // Read our secondary file for paragraph markers and word accentation
+            switch (token) {
+                .verse => {
+                    // Secondary parser should have the same verse marker for us
+                    const token2 = try self.parser2.next();
+                    if (token2 == .paragraph) {
+                        self.carryover_token = token;
+                        if (self.verbose)
+                            debug("TXT({s}) holdback BP5({s})", .{
+                                @tagName(token2),
+                                @tagName(token),
+                            });
+                        return token2;
+                    }
+                    if (token != token2) {
+                        err("Verse marker misalignment. {s} BP5({s} {s}) TXT({s} {s})", .{
+                            @tagName(self.parser.reference.book),
+                            @tagName(token),
+                            self.parser.value,
+                            @tagName(token2),
+                            self.parser2.value,
+                        });
+                        @panic("Verse misalignment.");
+                    }
+                    if (self.verbose)
+                        debug("BP5({s} {s}) aligns to TXT({s} {s})", .{
+                            @tagName(token),
+                            self.parser.value,
+                            @tagName(token2),
+                            self.parser2.value,
+                        });
+                    return token;
+                },
+                .word => {
+                    // Secondary parser should have the same word for us, but
+                    // it might be a paragraph.
+                    const token2 = try self.parser2.next();
+                    if (token2 == .paragraph) {
+                        if (self.verbose)
+                            debug("BP5({s} {s}) holdback. TXT({s})", .{
+                                @tagName(token),
+                                self.parser.value,
+                                @tagName(token2),
+                            });
+                        self.carryover_token = token;
+                        return token2;
+                    }
+                    if (self.verbose)
+                        debug("BP5({s} {s}) aligns to TXT({s} {s})", .{
+                            @tagName(token),
+                            self.parser.value,
+                            @tagName(token2),
+                            self.parser2.value,
+                        });
+                    if (token2 != .word) {
+                        @panic("Expected word in TXT file");
+                    }
+                    return token;
+                },
+                .variant_alt, .variant_end, .variant_mark => {
+                    // Should not be sent
+                    unreachable;
+                },
+                .eof => {
+                    // Already handled above
+                    unreachable;
+                },
+                .strongs, .parsing, .paragraph, .unexpected_character, .unknown => return token,
+            }
+
             return token;
         }
 
@@ -69,6 +179,10 @@ pub fn reader() type {
 
         pub fn reference(self: *Self) praxis.Reference {
             return self.parser.reference;
+        }
+
+        pub fn debug_slice(self: *Self) []const u8 {
+            return self.parser.debug_slice();
         }
     };
 }
@@ -578,9 +692,12 @@ test "test_parse_byzantine_files" {
 }
 
 const std = @import("std");
+const bufPrint = std.fmt.bufPrint;
 const BoundedArray = std.BoundedArray;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const warn = std.log.warn;
+const err = std.log.err;
+const debug = std.log.debug;
 const Allocator = std.mem.Allocator;
 
 const praxis = @import("praxis");
