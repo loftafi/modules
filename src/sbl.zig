@@ -23,8 +23,8 @@ pub fn reader() type {
             const dir = try std.fs.cwd().openDir(folder, .{ .iterate = false });
             const data = try load_file_bytes(allocator, dir, files[0]);
             var parser = SblParser.init(data);
-            parser.reference.module = .byzantine;
-            parser.reference.book = extract_book_from_filename(files[0]);
+            parser.reference.module = .sbl;
+            parser.reference.book = extract_book_from_filename(sbl_book_name(files[0]));
             return .{
                 .data = data,
                 .parser = parser,
@@ -44,6 +44,10 @@ pub fn reader() type {
             return self.parser.word;
         }
 
+        pub fn greek(self: *Self) []const u8 {
+            return self.parser.word;
+        }
+
         pub fn next(self: *Self, allocator: Allocator) !TextToken {
             var token = try self.parser.next();
             if (token == .eof and self.files_index < files.len) {
@@ -51,7 +55,7 @@ pub fn reader() type {
                 allocator.free(self.data);
                 self.data = try load_file_bytes(allocator, dir, files[self.files_index]);
                 self.parser = SblParser.init(self.data);
-                self.parser.reference.book = extract_book_from_filename(files[self.files_index]);
+                self.parser.reference.book = extract_book_from_filename(sbl_book_name(files[self.files_index]));
                 token = try self.parser.next();
                 self.files_index += 1;
             }
@@ -59,11 +63,19 @@ pub fn reader() type {
         }
 
         pub fn module(_: *Self) praxis.Module {
-            return praxis.Module.byzantine;
+            return praxis.Module.sbl;
         }
 
         pub fn reference(self: *Self) praxis.Reference {
             return self.parser.reference;
+        }
+
+        pub fn punctuation(self: *Self) ?[]const u8 {
+            return self.parser.punctuation();
+        }
+
+        pub fn debug_slice(self: *Self) []const u8 {
+            return self.parser.debug_slice();
         }
     };
 }
@@ -229,6 +241,12 @@ const SblParser = struct {
         self.data.ptr += 1;
     }
 
+    pub fn punctuation(self: *SblParser) ?[]const u8 {
+        const trailing = self.value.len - self.word.len;
+        if (trailing == 0) return null;
+        return self.value[(self.value.len - trailing)..];
+    }
+
     pub fn debug_slice(self: *SblParser) []const u8 {
         if (self.data.len == 0) return "";
         const show = @min(20, self.data.len);
@@ -247,6 +265,13 @@ fn is_eol(c: u8) bool {
 // Conservatively only accept punctuation we have seen in data sources.
 fn is_sbl_punctuation(c: u8) bool {
     return c == ':' or c == '.' or c == ',' or c == ';' or c == '-';
+}
+
+fn sbl_book_name(name: []const u8) []const u8 {
+    if (std.ascii.eqlIgnoreCase("64-Jn-morphgnt.txt", name)) {
+        return "64-Jh-morphgnt.txt";
+    }
+    return name;
 }
 
 test "basic" {

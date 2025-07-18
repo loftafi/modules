@@ -1,13 +1,12 @@
 .{
     .name = .modules,
-    .version = "0.0.2",
+    .version = "0.0.4",
     .fingerprint = 0x2eb743d7876c4857,
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .praxis = .{
-            .url = "git+https://github.com/loftafi/praxis.git#31d56da4c773266d7ba2d4489597281933239449",
-            .hash = "praxis-0.1.2-FPf2Nf7UBAAQUBcLZOG6aPuQi8Ow41_1Vv5Z0y37FDZl",
-            //.path = "../praxis",
+            .url = "git+https://github.com/loftafi/praxis.git#c25dcc7c7c2543463b9a1d71688f87ad48fc2e01",
+            .hash = "praxis-0.1.7-FPf2Ne_YBABL4KXk3gLQctCeuJPNvdzo6lHTIN9CU9Xd",
         },
     },
     .paths = .{

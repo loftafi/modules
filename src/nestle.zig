@@ -4,15 +4,17 @@ const folder = "resources/nestle1904";
 pub fn reader() type {
     return struct {
         const Self = @This();
-        data: []u8,
+        data: []u8 = "",
         parser: NestleParser,
+        verbose: bool = false,
 
-        pub fn init(allocator: Allocator) !Self {
+        pub fn init(allocator: Allocator, verbose: bool) !Self {
             const dir = try std.fs.cwd().openDir(folder, .{});
             const data = try load_file_bytes(allocator, dir, filename);
             return .{
                 .data = data,
                 .parser = NestleParser.init(modules.remove_bom(data)),
+                .verbose = verbose,
             };
         }
 
@@ -24,11 +26,21 @@ pub fn reader() type {
             return self.parser.next();
         }
 
-        pub fn value(self: *Self) ![]const u8 {
+        pub fn value(self: *Self) []const u8 {
             return self.parser.value;
         }
 
-        pub fn word(self: *Self) ![]const u8 {
+        pub fn greek(self: *Self) []const u8 {
+            return self.parser.word;
+        }
+
+        pub fn punctuation(self: *Self) ?[]const u8 {
+            const trailing = self.parser.value.len - self.parser.value.len;
+            if (trailing == 0) return null;
+            return self.parser.value[trailing..];
+        }
+
+        pub fn word(self: *Self) []const u8 {
             return self.parser.word;
         }
 
@@ -38,6 +50,10 @@ pub fn reader() type {
 
         pub fn reference(self: *Self) praxis.Reference {
             return self.parser.reference;
+        }
+
+        pub fn debug_slice(self: *Self) []const u8 {
+            return self.parser.debug_slice();
         }
     };
 }
@@ -337,7 +353,7 @@ test "test_parse_nestle_files" {
     const allocator = std.testing.allocator;
     var token_count: usize = 0;
 
-    var p = try reader().init(allocator);
+    var p = try reader().init(allocator, true);
     defer p.deinit(allocator);
 
     while (true) {
