@@ -7,19 +7,19 @@ pub fn main() !void {
     var dictionary = try Dictionary.create(arena.allocator());
     errdefer dictionary.destroy(arena.allocator());
     try dictionary.loadFile(arena.allocator(), "resources/dictionary/dictionary.txt");
-    try dictionary.saveBinaryFile("resources/dictionary/dictionary.bin", false);
+    try dictionary.saveBinaryFile("generated/dictionary.bin", false);
 
-    var byzantine_reader = try byzantine.reader().init(allocator);
-    var module = Module{};
+    var module = Module.init();
+    var byzantine_reader = try byzantine.reader().init(allocator, true);
     try module.read(allocator, &byzantine_reader);
-    try module.saveText();
-    try module.saveBinary();
+    try module.saveText(allocator);
+    try module.saveBinary(allocator);
 
-    var nestle_reader = try nestle.reader().init(allocator);
-    module = Module{};
+    module = Module.init();
+    var nestle_reader = try nestle.reader().init(allocator, true);
     try module.read(allocator, &nestle_reader);
-    try module.saveText();
-    try module.saveBinary();
+    try module.saveText(allocator);
+    try module.saveBinary(allocator);
 }
 
 const std = @import("std");
