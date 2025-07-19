@@ -11,11 +11,12 @@ pub fn reader() type {
     return struct {
         const Self = @This();
         parser: ByzParser,
+        original: []u8,
         data: []u8,
         parser2: ByzParser,
         data2: []u8,
         files_index: usize = 0,
-        carryover_token: TextToken = .unknown,
+        carryover_token: Token = .unknown,
         verbose: bool = false,
 
         pub fn init(allocator: Allocator, verbose: bool) !Self {
@@ -36,6 +37,7 @@ pub fn reader() type {
                 debug("reading book {s}", .{@tagName(book)});
 
             return .{
+                .original = data,
                 .data = data,
                 .parser = parser,
                 .data2 = data2,
@@ -51,42 +53,23 @@ pub fn reader() type {
             allocator.free(self.data2);
         }
 
-        pub fn value(self: *Self) []const u8 {
-            return self.parser.value;
-        }
-
-        pub fn punctuation(self: *Self) ?[]const u8 {
-            return self.parser2.punctuation();
-        }
-
-        pub fn greek(self: *Self) []const u8 {
-            if (self.parser2.greek.len > 0) {
-                return self.parser2.greek.slice();
-            }
-            return self.parser.value;
-        }
-
-        pub fn word(self: *Self) []const u8 {
-            return self.parser.word;
-        }
-
         // Read parser2 tokens for paragraph and accentation,
         // supplimented by parser1 tokens for parsing data.
-        pub fn next(self: *Self, allocator: Allocator) !TextToken {
-            var token: TextToken = .unknown;
+        pub fn next(self: *Self, allocator: Allocator) !Token {
+            var token: Token = .{ .unknown = {} };
 
-            if (self.carryover_token != .unknown) {
+            if (self.carryover_token == .unknown) {
+                token = try self.parser.next();
+            } else {
                 token = self.carryover_token;
                 self.carryover_token = .unknown;
                 if (self.verbose)
-                    debug("using the holdback BP5({s} {s})", .{
-                        @tagName(token),
-                        self.parser.value,
+                    debug("using the holdback BP5({s} {any})", .{
+                        @tagName(token), token,
                     });
-            } else {
-                token = try self.parser.next();
             }
 
+            // Are there more files to continue into?
             if (token == .eof) {
                 if (self.files_index >= files.len) return token;
 
@@ -94,7 +77,6 @@ pub fn reader() type {
                 const dir = try std.fs.cwd().openDir(folder, .{});
 
                 const book = extract_book_from_filename(files[self.files_index]);
-
                 var filename = try bufPrint(&buf, "{s}.BP5", .{
                     files[self.files_index],
                 });
@@ -129,24 +111,21 @@ pub fn reader() type {
                             });
                         return token2;
                     }
-                    if (token != token2) {
-                        err("Verse marker misalignment. {s} BP5({s} {s}) TXT({s} {s})", .{
-                            @tagName(self.parser.reference.book),
-                            @tagName(token),
-                            self.parser.value,
-                            @tagName(token2),
-                            self.parser2.value,
+                    if (token2 != .verse) {
+                        err("Verse marker misalignment. {s} BP5({any}) TXT({any})", .{
+                            @tagName(token.verse.book),
+                            token.verse,
+                            token2,
                         });
                         @panic("Verse misalignment.");
                     }
                     if (self.verbose)
-                        debug("BP5({s} {s}) aligns to TXT({s} {s})", .{
+                        debug("BP5({s} {any}) aligns to TXT({any})", .{
                             @tagName(token),
-                            self.parser.value,
-                            @tagName(token2),
-                            self.parser2.value,
+                            token,
+                            token2,
                         });
-                    return token;
+                    return token2;
                 },
                 .word => {
                     // Secondary parser should have the same word for us, but
@@ -156,7 +135,7 @@ pub fn reader() type {
                         if (self.verbose)
                             debug("BP5({s} {s}) holdback. TXT({s})", .{
                                 @tagName(token),
-                                self.parser.value,
+                                token.word.word,
                                 @tagName(token2),
                             });
                         self.carryover_token = token;
@@ -165,14 +144,14 @@ pub fn reader() type {
                     if (self.verbose)
                         debug("BP5({s} {s}) aligns to TXT({s} {s})", .{
                             @tagName(token),
-                            self.parser.value,
+                            token.word.word,
                             @tagName(token2),
-                            self.parser2.value,
+                            token2.word.word,
                         });
                     if (token2 != .word) {
                         @panic("Expected word in TXT file");
                     }
-                    return token;
+                    return token2;
                 },
                 .variant_alt, .variant_end, .variant_mark => {
                     // Should not be sent
@@ -182,7 +161,7 @@ pub fn reader() type {
                     // Already handled above
                     unreachable;
                 },
-                .strongs, .parsing, .paragraph, .unexpected_character, .unknown => return token,
+                .strongs, .parsing, .paragraph, .invalid_token, .unknown => return token,
             }
 
             return token;
@@ -190,10 +169,6 @@ pub fn reader() type {
 
         pub fn module(_: *Self) praxis.Module {
             return praxis.Module.byzantine;
-        }
-
-        pub fn reference(self: *Self) praxis.Reference {
-            return self.parser.reference;
         }
 
         pub fn debug_slice(self: *Self) []const u8 {
@@ -209,18 +184,13 @@ const ByzParser = struct {
     /// A pointer to the original buffer.
     original: []const u8 = "",
 
-    /// The text value of each recognised token
-    value: []const u8 = "",
-
-    /// If a token is a `word`, then this variable contains
-    /// the word minus any punctuation.
-    word: []const u8 = "",
-    greek: BoundedArray(u8, praxis.MAX_WORD_SIZE),
+    /// Cache a greek betacode decoding
+    greek_buffer: BoundedArray(u8, praxis.MAX_WORD_SIZE),
 
     /// Internal state tracking of variant markers.
     variant: u8 = 0,
 
-    reference: Reference = .unknown,
+    current_reference: Reference = .unknown,
 
     /// Reads token from the input data byte array. The array may
     /// be destructively modified in the process of reading it.
@@ -228,11 +198,9 @@ const ByzParser = struct {
         return .{
             .data = data,
             .original = data,
-            .value = "",
-            .word = "",
             .variant = 0,
-            .greek = .{ .len = 0 },
-            .reference = .{
+            .greek_buffer = .{ .len = 0 },
+            .current_reference = .{
                 .module = .byzantine,
                 .book = book,
                 .chapter = 0,
@@ -242,14 +210,13 @@ const ByzParser = struct {
         };
     }
 
-    pub fn next(self: *ByzParser) !TextToken {
+    pub fn next(self: *ByzParser) !Token {
         const lines = self.skip_space();
         if (lines > 1) {
-            self.value.len = self.data.ptr - self.value.ptr;
-            return .paragraph;
+            return .{ .paragraph = {} };
         }
-        if (self.data.len == 0) return .eof;
-        self.value = self.data;
+        if (self.data.len == 0) return .{ .eof = {} };
+        var value = self.data;
 
         // If we see a digit, it is the start of a strongs number
         // or the start of a verse reference.
@@ -261,105 +228,75 @@ const ByzParser = struct {
             }
             if (self.data.len == 0 or !is_verse_divider(self.data[0])) {
                 // It's a strongs number
-                self.value.len = self.data.ptr - self.value.ptr;
+                value.len = self.data.ptr - value.ptr;
                 if (self.data.len == 0 or is_ascii_whitespace(self.data[0])) {
-                    return .strongs;
+                    return .{ .strongs = [2]u16{ x, 0 } };
                 }
-                return .unexpected_character;
+                return .{ .invalid_token = value };
             } else {
                 // More characters exist and its a verse divider.
                 // It's a verse reference.
-                self.reference.chapter = x;
+                var reference = self.current_reference;
+                reference.chapter = x;
                 x = 0;
                 self.advance();
-                if (!is_ascii_digit(self.data[0]))
-                    return .unexpected_character;
+                if (!is_ascii_digit(self.data[0])) {
+                    value.len = self.data.ptr - value.ptr;
+                    return .{ .invalid_token = value };
+                }
                 while (self.data.len > 0 and is_ascii_digit(self.data[0])) {
                     x = (x * 10) + (self.data[0] - '0');
                     self.advance();
                 }
-                self.reference.verse = x;
-                self.value.len = self.data.ptr - self.value.ptr;
+                reference.verse = x;
+                value.len = self.data.ptr - value.ptr;
                 if (self.variant != 0) {
-                    warn("Verse marker '{s}' encountered in variant.", .{self.value});
+                    warn("Verse marker '{s}' encountered in variant.", .{value});
                 }
                 if (self.data.len == 0 or is_ascii_whitespace(self.data[0])) {
-                    return .verse;
+                    return .{ .verse = reference };
                 }
-                return .unexpected_character;
+                return .{ .invalid_token = value };
             }
         }
 
         // Is this a word?
         if (is_ascii_betacode_start(self.data[0])) {
-            self.advance();
+            self.data = self.data[1..];
             while (self.data.len > 0 and is_ascii_betacode(self.data[0])) {
                 self.advance();
             }
-            self.word = self.value;
-            self.word.len = self.data.ptr - self.value.ptr;
-
-            // Option 1 is to end by whitespace/eof
-            if (self.data.len == 0 or is_ascii_whitespace(self.data[0])) {
-                // Ended by whitespace or no more data
-                self.value.len = self.data.ptr - self.value.ptr;
-                self.greek.clear();
-                _ = betacode_to_greek(self.value, .tlg, &self.greek) catch |e| {
-                    std.log.err("invalid betacode {s}", .{self.value});
-                    return e;
-                };
-                while (self.data.len > 0 and is_punctuation(self.data[0])) {
-                    self.advance();
-                    self.value.len += 1;
-                }
-                return .word;
-            }
 
             // Grab ' at end of word to signify ellision
-            if (self.data[0] == '\'') {
-                self.advance();
-                self.value.len = self.data.ptr - self.value.ptr;
-                self.word = self.value;
-                if (self.data.len == 0 or is_ascii_whitespace(self.data[0])) {
-                    self.greek.clear();
-                    _ = betacode_to_greek(self.value, .tlg, &self.greek) catch |e| {
-                        std.log.err("invalid betacode {s}", .{self.value});
-                        return e;
-                    };
-                    while (self.data.len > 0 and is_punctuation(self.data[0])) {
-                        self.advance();
-                        self.value.len += 1;
-                    }
-                    return .word;
-                }
+            if (self.data.len > 0 and self.data[0] == '\'') {
+                self.data = self.data[1..];
+            }
+            value.len = self.data.ptr - value.ptr;
+
+            self.greek_buffer.clear();
+            const greek = betacode_to_greek(value, .tlg, &self.greek_buffer) catch |e| {
+                std.log.err("invalid betacode {s}. {any}", .{ value, e });
+                return .{ .invalid_token = value };
+            };
+
+            // Add any leftover punctuation to the `value` but not the word.
+            while (self.data.len > 0 and is_punctuation(self.data[0])) {
+                try self.greek_buffer.append(self.data[0]);
+                self.data = self.data[1..];
+                value.len += 1;
             }
 
-            // Is the trailing character valid punctuation?
-            if (is_punctuation(self.data[0])) {
-                self.value.len = self.data.ptr - self.value.ptr;
-                self.word = self.value; // word should not include the punctuation.
-                self.advance();
-                while (self.data.len > 0 and is_punctuation(self.data[0])) {
-                    self.advance();
-                }
-                if (self.data.len == 0 or is_ascii_whitespace(self.data[0])) {
-                    self.value.len = self.data.ptr - self.value.ptr;
-                    _ = betacode_to_greek(self.word, .tlg, &self.greek) catch |e| {
-                        std.log.err("check {s}", .{self.value});
-                        return e;
-                    };
-                    return .word;
-                }
+            if (self.data.len == 0 or is_eol(self.data[0]) or is_ascii_whitespace(self.data[0])) {
+                return .{ .word = .{ .text = self.greek_buffer.slice(), .word = greek } };
             }
 
-            return .unexpected_character;
+            return .{ .invalid_token = value[0 .. value.len + 1] };
         }
 
         // Is it a paragraph mark?
         if (self.data[0] == '?') {
             self.advance();
-            self.value.len = self.data.ptr - self.value.ptr;
-            return .paragraph;
+            return .{ .paragraph = {} };
         }
 
         // Is this a parsing tag
@@ -380,42 +317,45 @@ const ByzParser = struct {
                 return self.next();
             }
             _ = self.skip_space();
-            self.value = self.data;
+            value = self.data;
             while (self.data.len > 0 and is_parsing_letter(self.data[0])) {
                 self.advance();
             }
-            self.value.len = self.data.ptr - self.value.ptr;
-            if (self.value.len == 0) {
-                return .unexpected_character;
+            value.len = self.data.ptr - value.ptr;
+            if (value.len == 0) {
+                return .{ .invalid_token = "ERR" };
             }
             _ = self.skip_space();
             if (self.data.len > 0 and self.data[0] == '}') {
                 self.advance();
-                if (self.value.len == 1 and is_paragraph_tag(self.value[0])) {
+                if (value.len == 1 and is_paragraph_tag(value[0])) {
                     return .paragraph;
                 }
-                _ = try parse_tag(self.value);
-                return .parsing;
+                const parsing = parse_tag(value) catch |e| {
+                    std.log.err("invalid parsing {s}. {any}", .{ value, e });
+                    return .{ .invalid_token = value };
+                };
+                return .{ .parsing = parsing };
             }
-            return .unexpected_character;
+            return .{ .invalid_token = value };
         }
 
         // Is this a variant marker?
         if (self.data[0] == '|') {
+            const c = self.data[0..1];
             self.advance();
-            self.value.len = self.data.ptr - self.value.ptr;
-            const tag: TextToken = switch (self.variant) {
-                0 => .variant_mark,
-                1 => .variant_alt,
-                2 => .variant_end,
-                else => .unexpected_character,
+            const tag: Token = switch (self.variant) {
+                0 => .{ .variant_mark = {} },
+                1 => .{ .variant_alt = {} },
+                2 => .{ .variant_end = {} },
+                else => .{ .invalid_token = c },
             };
             self.variant += 1;
             if (self.variant == 3) self.variant = 0;
             return tag;
         }
 
-        return .unexpected_character;
+        return .{ .invalid_token = self.data[0..1] };
     }
 
     /// Pass over whitespace and comments. Return the number of lines skipped.
@@ -456,18 +396,18 @@ const ByzParser = struct {
         self.data.ptr += 1;
     }
 
-    pub fn punctuation(self: *ByzParser) ?[]const u8 {
-        const trailing = self.value.len - self.word.len;
-        if (trailing == 0) return null;
-        return self.value[(self.value.len - trailing)..];
-    }
-
     pub fn debug_slice(self: *ByzParser) []const u8 {
         if (self.data.len == 0) return "";
         const show = @min(20, self.data.len);
         return self.data[0..show];
     }
 };
+
+pub fn punctuation(word: Word) ?[]const u8 {
+    const trailing = word.text.len - word.word.len;
+    if (trailing == 0) return null;
+    return word.text[(word.text.len - trailing)..];
+}
 
 fn is_ascii_whitespace(c: u8) bool {
     return (c <= 32);
@@ -511,192 +451,200 @@ fn is_paragraph_tag(c: u8) bool {
     return c == 'p' or c == 'P' or c == 'π' or c == 'Π';
 }
 
+// Test equals helper
+pub fn ev(a: TokenType, b: Token) !Token {
+    if (a == b) {
+        return b;
+    }
+    std.log.err("Expected {s}={any}", .{ @tagName(a), b });
+    return error.IncorrectTokenTypeReturned;
+}
+
 test "basic" {
     var p = ByzParser.init(&"   22".*, .mark);
-    try ee(.strongs, p.next());
-    try ee(.eof, p.next());
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"2  3".*, .mark);
-    try ee(.strongs, p.next());
-    try es("2", p.value);
-    try ee(.strongs, p.next());
-    try es("3", p.value);
-    try ee(.eof, p.next());
+    var v = try ev(.strongs, try p.next());
+    try ee(2, v.strongs[0]);
+    v = try ev(.strongs, try p.next());
+    try ee(3, v.strongs[0]);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"22 2:3 0".*, .mark);
-    try ee(.strongs, p.next());
-    try es("22", p.value);
-    try ee(.verse, p.next());
-    try es("2:3", p.value);
-    try ee(.strongs, p.next());
-    try es("0", p.value);
-    try ee(.eof, p.next());
+    v = try ev(.strongs, try p.next());
+    try ee(22, v.strongs[0]);
+    v = try ev(.verse, try p.next());
+    try ee(2, v.verse.chapter);
+    try ee(3, v.verse.verse);
+    v = try ev(.strongs, try p.next());
+    try ee(0, v.strongs[0]);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&" 2:2 \t \r\n 2:3 0 \n ".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.verse, p.next());
-    try ee(.strongs, p.next());
-    try es("0", p.value);
-    try ee(.eof, p.next());
+    _ = try ev(.verse, try p.next());
+    _ = try ev(.verse, try p.next());
+    v = try ev(.strongs, try p.next());
+    try ee(0, v.strongs[0]);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&" 2:2 \t \r\n  \n 2:3 0 \n ".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.paragraph, p.next());
-    try ee(.verse, p.next());
-    try ee(.strongs, p.next());
-    try es("0", p.value);
-    try ee(.eof, p.next());
+    _ = try ev(.verse, try p.next());
+    _ = try ev(.paragraph, try p.next());
+    _ = try ev(.verse, try p.next());
+    v = try ev(.strongs, try p.next());
+    try ee(0, v.strongs[0]);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&" 2:2,   ".*, .mark);
-    try ee(.unexpected_character, p.next());
+    _ = try ev(.invalid_token, try p.next());
 
     p = ByzParser.init(&" 22,   ".*, .mark);
-    try ee(.unexpected_character, p.next());
+    _ = try ev(.invalid_token, try p.next());
 
     p = ByzParser.init(&" 2: ".*, .mark);
-    try ee(.unexpected_character, p.next());
+    _ = try ev(.invalid_token, try p.next());
 
     p = ByzParser.init(&"99 2: ".*, .mark);
-    try ee(.strongs, p.next());
-    try ee(.unexpected_character, p.next());
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.invalid_token, try p.next());
 
     p = ByzParser.init(&"3:8 o logos 9 ".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.word, p.next());
-    try es("o", p.value);
-    try ee(.word, p.next());
-    try es("logos", p.value);
-    try ee(.strongs, p.next());
-    try es("9", p.value);
-    try ee(.eof, p.next());
+    _ = try ev(.verse, try p.next());
+    v = try ev(.word, try p.next());
+    try es("ο", v.word.word);
+    v = try ev(.word, try p.next());
+    try es("λογος", v.word.word);
+    v = try ev(.strongs, try p.next());
+    try ee(9, v.strongs[0]);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"3:8 o {N-NSM}".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.word, p.next());
-    try es("o", p.value);
-    try ee(.parsing, p.next());
-    try es("N-NSM", p.value);
-    try ee(.eof, p.next());
+    _ = try ev(.verse, try p.next());
+    v = try ev(.word, try p.next());
+    try es("ο", v.word.word);
+    v = try ev(.parsing, try p.next());
+    try ee(try parse_tag("N-NSM"), v.parsing);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"3:8 o {N-NSM} a".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.word, p.next());
-    try es("o", p.value);
-    try ee(.parsing, p.next());
-    try es("N-NSM", p.value);
-    try ee(.word, p.next());
-    try es("a", p.value);
-    try ee(.eof, p.next());
+    _ = try ev(.verse, try p.next());
+    v = try ev(.word, try p.next());
+    try es("ο", v.word.text);
+    v = try ev(.parsing, try p.next());
+    try ee(try parse_tag("N-NSM"), v.parsing);
+    v = try ev(.word, try p.next());
+    try es("α", v.word.word);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"3:8 o {N-NSM".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.word, p.next());
-    try es("o", p.value);
-    try ee(.unexpected_character, p.next());
+    _ = try ev(.verse, try p.next());
+    v = try ev(.word, try p.next());
+    try es("ο", v.word.word);
+    _ = try ev(.invalid_token, try p.next());
 
     p = ByzParser.init(&"3:8 o | logos | logon | hn.".*, .mark);
-    try ee(.verse, p.next());
-    try ee(.word, p.next());
-    try ee(.variant_mark, p.next());
-    try ee(.word, p.next());
-    try ee(.variant_alt, p.next());
-    try ee(.word, p.next());
-    try ee(.variant_end, p.next());
-    try ee(.word, p.next());
-    try es("hn", p.word);
-    try es("hn.", p.value);
-    try ee(.eof, p.next());
+    _ = try ev(.verse, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.variant_mark, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.variant_alt, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.variant_end, try p.next());
+    v = try ev(.word, try p.next());
+    try es("ην", v.word.word);
+    try es("ην.", v.word.text);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&
         \\1:1 {p} o 3739 {R-NSN} hn 1510 5707 {V-IAI-3S} ap 575 {PREP} archv 746
         \\{N-GSF} o 3739 {R-ASN} akhkoamen 191 5754 {V-2RAI-1P-ATT}
     .*, .mark);
-    try ee(.verse, p.next());
-    try ee(.paragraph, p.next());
-    try ee(.word, p.next());
-    try ee(.strongs, p.next());
+    _ = try ev(.verse, try p.next());
+    _ = try ev(.paragraph, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.strongs, try p.next());
 
     // Skip N and B annotations
     p = ByzParser.init(&"BASILEU/EI E)PI\\ {N E)PI\\ > - } TH=S".*, .mark);
-    try ee(.word, p.next());
-    try es("βασιλεύει", p.greek.slice());
-    try es("BASILEU/EI", p.value);
-    try ee(.word, p.next());
-    try es("E)PI\\", p.value);
-    try es("ἐπὶ", p.greek.slice());
-    try ee(.word, p.next());
-    try es("TH=S", p.value);
-    try es("τῆς", p.greek.slice());
-    try ee(.eof, p.next());
+    v = try ev(.word, try p.next());
+    try es("βασιλεύει", v.word.word);
+    //try es("BASILEU/EI", v.word.word);
+    v = try ev(.word, try p.next());
+    try es("ἐπὶ", v.word.text);
+    try es("ἐπὶ", v.word.word);
+    v = try ev(.word, try p.next());
+    try es("τῆς", v.word.text);
+    try es("τῆς", v.word.word);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"12:23 *OU(=TOS HN E)N A)RXH=| O\\S O\\N QEO/N. ? ".*, .mark);
-    try ee(.verse, p.next());
-    try ee(12, p.reference.chapter);
-    try ee(23, p.reference.verse);
-    try ee(.word, p.next());
-    try ee(.word, p.next());
-    try ee(.word, p.next());
-    try ee(.word, p.next());
-    try ee(.word, p.next());
-    try ee(.word, p.next());
-    try ee(.word, p.next());
-    try ee(.paragraph, p.next());
-    try ee(.eof, p.next());
+    v = try ev(.verse, try p.next());
+    _ = try ee(12, v.verse.chapter);
+    _ = try ee(23, v.verse.verse);
+    _ = try ev(.word, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.paragraph, try p.next());
+    _ = try ev(.eof, try p.next());
 
     // Skip N and B annotations
     p = ByzParser.init(&
         \\02.01 teknia 5040 {N-VPN} mou 1473 {P-1GS} tauta 3778 {D-APN} 
         \\grafw 1125 {V-PAI-1S} umin 4771 {P-2DP} ina 2443 {CONJ}
     .*, .mark);
-    try ee(.verse, p.next());
-    try ee(2, p.reference.chapter);
-    try ee(1, p.reference.verse);
-    try ee(.word, p.next());
-    try es("teknia", p.value);
-    try ee(.strongs, p.next());
-    try ee(.parsing, p.next());
-    try ee(.word, p.next());
-    try es("mou", p.value);
-    try ee(.strongs, p.next());
-    try ee(.parsing, p.next());
-    try ee(.word, p.next());
-    try es("tauta", p.value);
-    try ee(.strongs, p.next());
-    try ee(.parsing, p.next());
-    try ee(.word, p.next());
-    try es("grafw", p.value);
-    try ee(.strongs, p.next());
-    try ee(.parsing, p.next());
-    try es("V-PAI-1S", p.value);
-    try ee(.word, p.next());
-    try es("umin", p.value);
-    try ee(.strongs, p.next());
-    try ee(.parsing, p.next());
-    try es("P-2DP", p.value);
+    v = try ev(.verse, try p.next());
+    try ee(2, v.verse.chapter);
+    try ee(1, v.verse.verse);
+    v = try ev(.word, try p.next());
+    try es("τεκνια", v.word.word);
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("μου", v.word.word);
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("ταυτα", v.word.word);
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("γραφω", v.word.word);
+    _ = try ev(.strongs, try p.next());
+    v = try ev(.parsing, try p.next());
+    try ee(try parse_tag("V-PAI-1S"), v.parsing);
+    v = try ev(.word, try p.next());
+    try es("υμιν", v.word.word);
+    _ = try ev(.strongs, try p.next());
+    v = try ev(.parsing, try p.next());
+    try ee(try parse_tag("P-2DP"), v.parsing);
 
     p = ByzParser.init(&"A)NQRW/PWN,".*, .mark);
-    try ee(.word, p.next());
-    try es("A)NQRW/PWN", p.word);
-    try es("A)NQRW/PWN,", p.value);
-    try es("ἀνθρώπων", p.greek.slice());
-    try es(",", p.punctuation().?);
-    try ee(.eof, p.next());
+    v = try ev(.word, try p.next());
+    try es("ἀνθρώπων", v.word.word);
+    try es("ἀνθρώπων,", v.word.text);
+    try es(",", punctuation(v.word).?);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"O A)NQRW/PWN, ".*, .mark);
-    try ee(.word, p.next());
-    try ee(null, p.punctuation());
-    try ee(.word, p.next());
-    try es("A)NQRW/PWN", p.word);
-    try es("A)NQRW/PWN,", p.value);
-    try es("ἀνθρώπων", p.greek.slice());
-    try es(",", p.punctuation().?);
-    try ee(.eof, p.next());
+    v = try ev(.word, try p.next());
+    try ee(null, punctuation(v.word));
+    v = try ev(.word, try p.next());
+    try es("ἀνθρώπων", v.word.word);
+    try es("ἀνθρώπων,", v.word.text);
+    try es(",", punctuation(v.word).?);
+    _ = try ev(.eof, try p.next());
 
     p = ByzParser.init(&"KAT' O)/NAR E)FA/NH AU)TW=|,".*, .mark);
-    try ee(.word, p.next());
-    try es("KAT'", p.value);
-    try ee(.word, p.next());
-    try es("O)/NAR", p.value);
+    v = try ev(.word, try p.next());
+    try es("κατ᾽", v.word.word);
+    v = try ev(.word, try p.next());
+    try es("ὄναρ", v.word.word);
 }
 
 test "test_parse_byzantine_files" {
@@ -706,26 +654,35 @@ test "test_parse_byzantine_files" {
     var p = try reader().init(allocator, true);
     defer p.deinit(allocator);
 
+    var ref: Reference = .unknown;
     while (true) {
         const token = p.next(allocator) catch |e| {
-            std.log.err("Failed parsing {s}. Error {any}", .{
+            std.log.err("Failed parsing {any}. Error {any}", .{
                 @tagName(p.module()),
                 e,
             });
             try std.testing.expect(false);
             break;
         };
-        if (token == .verse and token_count < 100) {
-            try std.testing.expectEqual(.matthew, p.reference().book);
-        }
-        if (token == .verse and .unknown != p.reference().book) {
-            try std.testing.expect(.unknown != p.reference().book);
+        if (token == .verse) {
+            if (token_count < 100) {
+                try std.testing.expectEqual(.matthew, token.verse.book);
+            }
+            if (.unknown != token.verse.book) {
+                try std.testing.expect(.unknown != token.verse.book);
+            }
+            ref = token.verse;
         }
         token_count += 1;
         if (.eof == token) {
             break;
         }
-        if (.unexpected_character == token) {
+        if (.invalid_token == token) {
+            std.log.err("invalid token = '{s}' in book {s} char={d}", .{
+                token.invalid_token,
+                @tagName(ref.book),
+                p.data.ptr - p.original.ptr,
+            });
             try std.testing.expect(false);
             break;
         }
@@ -751,7 +708,8 @@ const betacode_to_greek = praxis.betacode_to_greek;
 
 const modules = @import("modules.zig");
 const load_file_bytes = modules.load_file_bytes;
-const TextToken = modules.TextToken;
+const Token = modules.Token;
+const TokenType = modules.TokenType;
 const Module = modules.Module;
 const Paragraph = modules.Paragraph;
 const Verse = modules.Verse;

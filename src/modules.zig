@@ -27,7 +27,7 @@ pub const Module = struct {
 
         while (true) {
             if (token_count > max_token_guard) break;
-            const t = reader.next(allocator) catch |e| {
+            const t = verse_paragrah_flipper(allocator, reader) catch |e| {
                 std.log.err("Failed reading {s} module. '{s}' {any}", .{
                     @tagName(reader.module()),
                     reader.debug_slice(),
@@ -38,6 +38,7 @@ pub const Module = struct {
             if (annotation_skip == true and t != .variant_end) {
                 continue;
             }
+
             switch (t) {
                 .paragraph => {
                     if (text.items.len == 0) continue;
@@ -51,7 +52,7 @@ pub const Module = struct {
                 },
                 .verse => {
                     if (text.items.len > 0) try text.append(allocator, ' ');
-                    const ref = reader.reference();
+                    const ref = t.verse;
                     if (ref.verse == 1) {
                         try text.writer(allocator).print("{d}:{d}", .{
                             ref.chapter,
@@ -64,22 +65,19 @@ pub const Module = struct {
                     }
                     //try text.appendSlice(allocator, try reader.value());
                     try paragraph_verses.append(allocator, .{
-                        .reference = reader.reference(),
+                        .reference = t.verse,
                         .paragraph = paragraphs.items.len,
                         .index = text.items.len,
                     });
                     try all_verses.append(allocator, .{
-                        .reference = reader.reference(),
+                        .reference = t.verse,
                         .paragraph = paragraphs.items.len,
                         .index = text.items.len,
                     });
                 },
                 .word => {
                     if (text.items.len > 0) try text.append(allocator, ' ');
-                    try text.appendSlice(allocator, reader.greek());
-                    if (reader.punctuation()) |punctuation| {
-                        try text.appendSlice(allocator, punctuation);
-                    }
+                    try text.appendSlice(allocator, t.word.text);
                 },
                 .strongs => {
                     //
@@ -106,9 +104,9 @@ pub const Module = struct {
                 .unknown => {
                     unreachable;
                 },
-                .unexpected_character => {
+                .invalid_token => {
                     std.log.err(
-                        "Failed reading {s} module. '{s}' UnexpectedCharacter",
+                        "Failed reading {s} module. '{s}' invalid_token",
                         .{ @tagName(reader.module()), reader.debug_slice() },
                     );
                     return error.UnexpectedCharacter;
@@ -168,6 +166,28 @@ pub const Module = struct {
     }
 };
 
+var vp_carry: ?Token = null;
+
+fn verse_paragrah_flipper(allocator: Allocator, reader: anytype) !Token {
+    const token = try reader.next(allocator);
+    if (vp_carry != null) {
+        const t = vp_carry.?;
+        vp_carry = null;
+        return t;
+    }
+    if (token == .verse) {
+        const next = try reader.next(allocator);
+        if (next == .paragraph) {
+            vp_carry = token;
+            return next;
+        } else {
+            vp_carry = next;
+            return token;
+        }
+    }
+    return token;
+}
+
 /// A paragraph is a small unit of text that belongs to a module.
 /// a paragraph consists of words that can be tagged.
 pub const Paragraph = struct {
@@ -198,7 +218,7 @@ pub const Word = struct {
     word: []const u8 = "",
 };
 
-pub const TextToken = enum {
+pub const TokenType = enum {
     unknown,
     verse,
     word,
@@ -208,8 +228,22 @@ pub const TextToken = enum {
     variant_mark,
     variant_alt,
     variant_end,
-    unexpected_character,
+    invalid_token,
     eof,
+};
+
+pub const Token = union(TokenType) {
+    unknown: void,
+    verse: Reference,
+    word: Word,
+    strongs: [2]u16,
+    parsing: praxis.Parsing,
+    paragraph: void,
+    variant_mark: void,
+    variant_alt: void,
+    variant_end: void,
+    invalid_token: []const u8,
+    eof: void,
 };
 
 pub fn load_file_bytes(

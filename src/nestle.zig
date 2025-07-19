@@ -22,34 +22,12 @@ pub fn reader() type {
             allocator.free(self.data);
         }
 
-        pub fn next(self: *Self, _: Allocator) !TextToken {
+        pub fn next(self: *Self, _: Allocator) !Token {
             return self.parser.next();
-        }
-
-        pub fn value(self: *Self) []const u8 {
-            return self.parser.value;
-        }
-
-        pub fn greek(self: *Self) []const u8 {
-            return self.parser.word;
-        }
-
-        pub fn punctuation(self: *Self) ?[]const u8 {
-            const trailing = self.parser.value.len - self.parser.value.len;
-            if (trailing == 0) return null;
-            return self.parser.value[trailing..];
-        }
-
-        pub fn word(self: *Self) []const u8 {
-            return self.parser.word;
         }
 
         pub fn module(_: *Self) praxis.Module {
             return praxis.Module.nestle;
-        }
-
-        pub fn reference(self: *Self) praxis.Reference {
-            return self.parser.reference;
         }
 
         pub fn debug_slice(self: *Self) []const u8 {
@@ -60,23 +38,15 @@ pub fn reader() type {
 
 const NestleParser = struct {
     /// This is a pointer to the data buffer that is advanced as we read.
-    data: []u8,
+    data: []u8 = "",
 
     /// A pointer to the original buffer.
-    original: []const u8,
-
-    /// The text value of each recognised token
-    value: []u8,
-
-    /// If a token is a `word`, then this variable contains
-    /// the word minus any punctuation.
-    word: []const u8,
+    original: []const u8 = "",
 
     // The Nestle data is 6 columns per line.
-    column: usize,
+    column: usize = 0,
 
-    reference: Reference = undefined,
-    verse_tag: []const u8 = "",
+    current_verse: Reference = .unknown,
 
     /// Reads token from the input data byte array. The array may
     /// be destructively modified in the process of reading it.
@@ -84,10 +54,8 @@ const NestleParser = struct {
         return .{
             .data = data[0..data.len],
             .original = data,
-            .value = "",
-            .word = "",
             .column = 0,
-            .reference = .{
+            .current_verse = .{
                 .module = .nestle,
                 .book = .unknown,
                 .chapter = 0,
@@ -97,85 +65,87 @@ const NestleParser = struct {
         };
     }
 
-    pub fn next(self: *NestleParser) !TextToken {
+    pub fn next(self: *NestleParser) !Token {
         _ = self.skip_space();
         if (self.data.len == 0) return .eof;
-        self.read_field();
+        var value = self.read_field();
 
         // If first column is "BCV" this is a header row, skip it.
-        if (self.column == 0 and std.mem.eql(u8, "BCV", self.value)) {
-            self.read_field();
-            self.read_field();
-            self.read_field();
-            self.read_field();
-            self.read_field();
-            self.read_field();
-            self.read_field();
+        if (self.column == 0 and std.mem.eql(u8, "BCV", value)) {
+            _ = self.read_field();
+            _ = self.read_field();
+            _ = self.read_field();
+            _ = self.read_field();
+            _ = self.read_field();
+            _ = self.read_field();
+            value = self.read_field();
         }
 
         // Depending on the column, a different token type is returned.
         self.column += 1;
         switch (self.column) {
             1 => {
-                if (!std.mem.eql(u8, self.verse_tag, self.value)) {
-                    self.verse_tag = self.value;
-                    self.reference = praxis.parse_reference(self.value) catch |f| {
-                        std.log.err("Failed parsing {s}. Character {d}. {any}", .{
-                            self.value,
-                            self.original.len - self.data.len,
-                            f,
-                        });
-                        return f;
-                    };
-                    self.reference.module = .nestle;
-                    return .verse;
+                var reference = praxis.parse_reference(value) catch |f| {
+                    std.log.err("Failed parsing {s}. {any}", .{ value, f });
+                    return .{ .invalid_token = value };
+                };
+                if (self.current_verse.verse != reference.verse or self.current_verse.chapter != reference.chapter) {
+                    reference.module = .nestle;
+                    self.current_verse = reference;
+                    return .{ .verse = reference };
                 }
                 return self.next();
             },
-            2 => return .word,
+            2 => {
+                return .{ .word = .{
+                    .text = value,
+                    .word = remove_punctuation(value),
+                } };
+            },
             3 => {
-                self.read_field();
-                self.column += 1;
-                _ = parse_tag(self.value) catch |f| {
-                    std.log.err("Faild parsing {s}. {any}", .{ self.value, f });
-                    return f;
+                value = self.read_field();
+                const parsing = parse_tag(value) catch |f| {
+                    std.log.err("Faild parsing {s}. {any}", .{ value, f });
+                    return .{ .invalid_token = value };
                 };
-                return .parsing;
+                self.column += 1; // skip column 4
+                return .{ .parsing = parsing };
             },
             4 => unreachable,
             5 => {
-                const w = self.word;
-                const v = self.value;
-                self.read_field();
-                self.read_field();
-                self.word = w;
-                self.value = v;
+                // Skip last two columns
+                _ = self.read_field();
+                _ = self.read_field();
                 self.column = 0;
-                return .strongs;
+                return self.read_strongs_field(value);
             },
             else => unreachable,
         }
     }
 
-    fn read_field(self: *NestleParser) void {
+    fn read_field(self: *NestleParser) []const u8 {
         _ = self.skip_space();
-        self.value = self.data;
-        self.value.len = 0;
-        self.word = "";
+        var word: []const u8 = "";
+        var value: []u8 = self.data;
+        value.len = 0;
         var end: usize = 0;
         while (self.data.len > 0) {
             if (self.data[0] == '\t' or self.data[0] == '\n' or self.data[0] == '\r' or self.data[0] == 0)
                 break;
-            if (is_punctuation(self.data[0]) and self.word.len == 0) {
-                self.word = self.value;
-            }
             if (self.data[0] != ' ') {
-                end = self.value.len + 1;
+                end = value.len + 1;
             }
-            self.value.len += 1;
+            value.len += 1;
             self.advance();
         }
-        self.value.len = end;
+        value.len = end;
+        if (std.mem.endsWith(u8, value, "’")) {
+            const a = "᾽";
+            value[value.len - 3] = a[0];
+            value[value.len - 2] = a[1];
+            value[value.len - 1] = a[2];
+        }
+        word = value;
         if (self.data.len > 0) {
             if (self.data[0] == '\t') {
                 self.advance();
@@ -185,11 +155,37 @@ const NestleParser = struct {
                 self.advance();
             }
         }
-        if (std.mem.endsWith(u8, self.value, "’")) {
-            self.value[self.value.len - 3] = "᾽"[0];
-            self.value[self.value.len - 2] = "᾽"[1];
-            self.value[self.value.len - 1] = "᾽"[2];
+        return value;
+    }
+
+    fn read_strongs_field(self: *NestleParser, text: []const u8) Token {
+        var field: []u8 = @constCast(text);
+        _ = self.skip_space();
+        var sn: [2]u16 = .{ 0, 0 };
+
+        if (is_ascii_number(field[0])) {
+            sn[0] = field[0] - '0';
+            field = field[1..];
+            while (field.len > 0 and is_ascii_number(field[0])) {
+                sn[0] *= 10;
+                sn[0] += field[0] - '0';
+                field = field[1..];
+            }
+            if (field.len > 0 and field[0] == '&') {
+                field = field[1..];
+                while (field.len > 0 and is_ascii_number(field[0])) {
+                    sn[1] *= 10;
+                    sn[1] += field[0] - '0';
+                    field = field[1..];
+                }
+            }
         }
+        _ = self.skip_space();
+        if (field.len > 0) {
+            return .{ .invalid_token = field };
+        }
+
+        return .{ .strongs = sn };
     }
 
     /// Pass over whitespace and comments. Return the number of lines skipped.
@@ -237,8 +233,20 @@ const NestleParser = struct {
     }
 };
 
+inline fn remove_punctuation(text: []const u8) []const u8 {
+    var word = text;
+    while (word.len > 0 and is_punctuation(word[word.len - 1])) {
+        word.len -= 1;
+    }
+    return word;
+}
+
 fn is_ascii_whitespace(c: u8) bool {
     return (c <= 32);
+}
+
+fn is_ascii_number(c: u8) bool {
+    return (c >= '0' and c <= '9');
 }
 
 fn is_eol(c: u8) bool {
@@ -252,46 +260,52 @@ fn is_punctuation(c: u8) bool {
 
 test "basic" {
     {
-        var data = "Matt 1:1\tΒίβλος\tN-NSF\tN-NSF\t976\tβίβλος\tΒίβλος".*;
+        var data = "Matt 1:1\tΒίβλος\tN-NSF\tN-NSF\t976&39\tβίβλος\tΒίβλος".*;
         var p = NestleParser.init(&data);
-        try expectEqual(.verse, try p.next());
-        try expectEqualStrings("Matt 1:1", p.value);
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Βίβλος", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqualStrings("N-NSF", p.value);
-        try expectEqual(.strongs, try p.next());
-        try expectEqualStrings("976", p.value);
-        try expectEqual(.eof, try p.next());
+        var v = try ev(.verse, try p.next());
+        try ee(.matthew, v.verse.book);
+        try ee(1, v.verse.chapter);
+        try ee(1, v.verse.verse);
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Βίβλος", v.word.word);
+        v = try ev(.parsing, try p.next());
+        try ee(try parse_tag("N-NSF"), v.parsing);
+        v = try ev(.strongs, try p.next());
+        try ee(976, v.strongs[0]);
+        try ee(39, v.strongs[1]);
+        _ = try ev(.eof, try p.next());
     }
 
     {
         var data = "  Matt 1:1  \t   Βίβλος  \tN-NSF\tN-NSF\t976\tβίβλος\tΒίβλος".*;
         var p = NestleParser.init(&data);
-        try expectEqual(.verse, try p.next());
-        try expectEqualStrings("Matt 1:1", p.value);
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Βίβλος", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqualStrings("N-NSF", p.value);
-        try expectEqual(.strongs, try p.next());
-        try expectEqualStrings("976", p.value);
-        try expectEqual(.eof, try p.next());
+        var v = try ev(.verse, try p.next());
+        try ee(.matthew, v.verse.book);
+        try ee(1, v.verse.chapter);
+        try ee(1, v.verse.verse);
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Βίβλος", v.word.word);
+        v = try ev(.parsing, try p.next());
+        try ee(try parse_tag("N-NSF"), v.parsing);
+        v = try ev(.strongs, try p.next());
+        try ee(976, v.strongs[0]);
+        _ = try ev(.eof, try p.next());
     }
 
     {
-        //data = "Mark 12:25\tἀλλ’\tCONJ\tCONJ\t235\tἀλλά\tἀλλ’";
         var data = "Mark 12:25\tἀλλ’\tCONJ\tCONJ\t235\tἀλλά\tἀλλ’".*;
         var p = NestleParser.init(&data);
-        try expectEqual(.verse, try p.next());
-        try expectEqualStrings("Mark 12:25", p.value);
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("ἀλλ᾽", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqualStrings("CONJ", p.value);
-        try expectEqual(.strongs, try p.next());
-        try expectEqualStrings("235", p.value);
-        try expectEqual(.eof, try p.next());
+        var v = try ev(.verse, try p.next());
+        try ee(.mark, v.verse.book);
+        try ee(12, v.verse.chapter);
+        try ee(25, v.verse.verse);
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("ἀλλ᾽", v.word.word);
+        v = try ev(.parsing, try p.next());
+        try ee(try parse_tag("CONJ"), v.parsing);
+        v = try ev(.strongs, try p.next());
+        try expectEqual(235, v.strongs[0]);
+        _ = try ev(.eof, try p.next());
     }
 
     {
@@ -306,46 +320,47 @@ test "basic" {
             "Matt 1:1\tυἱοῦ\tN-GSM\tN-GSM\t5207\tυἱός\tυἱοῦ\n".* ++
             "Rev 9:2\tἈβραάμ.\tN-PRI\tN-PRI\t11\tἈβραάμ\tἈβραάμ\n".*;
         var p = NestleParser.init(&data);
-        try expectEqual(.verse, try p.next());
-        try expectEqualStrings("Matt 1:1", p.value);
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Βίβλος", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqualStrings("N-NSF", p.value);
-        try expectEqual(.strongs, try p.next());
-        try expectEqualStrings("976", p.value);
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("γενέσεως", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqual(.strongs, try p.next());
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Ἰησοῦ", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqual(.strongs, try p.next());
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Χριστοῦ", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqual(.strongs, try p.next());
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("υἱοῦ", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqual(.strongs, try p.next());
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Δαυεὶδ", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqual(.strongs, try p.next());
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("υἱοῦ", p.value);
-        try expectEqual(.parsing, try p.next());
-        try expectEqual(.strongs, try p.next());
-        try expectEqual(.verse, try p.next());
-        try expectEqualStrings("Rev 9:2", p.value);
-        try expectEqual(.revelation, p.reference.book);
-        try expectEqual(9, p.reference.chapter);
-        try expectEqual(2, p.reference.verse);
-        try expectEqual(.word, try p.next());
-        try expectEqualStrings("Ἀβραάμ.", p.value);
-        try expectEqualStrings("Ἀβραάμ", p.word);
+        var v = try ev(.verse, try p.next());
+        try ee(.matthew, v.verse.book);
+        try ee(1, v.verse.chapter);
+        try ee(1, v.verse.verse);
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Βίβλος", v.word.word);
+        v = try ev(.parsing, try p.next());
+        try ee(try parse_tag("N-NSF"), v.parsing);
+        v = try ev(.strongs, try p.next());
+        try expectEqual(976, v.strongs[0]);
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("γενέσεως", v.word.word);
+        _ = try ev(.parsing, try p.next());
+        _ = try ev(.strongs, try p.next());
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Ἰησοῦ", v.word.word);
+        _ = try ev(.parsing, try p.next());
+        _ = try ev(.strongs, try p.next());
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Χριστοῦ", v.word.word);
+        _ = try ev(.parsing, try p.next());
+        _ = try ev(.strongs, try p.next());
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("υἱοῦ", v.word.word);
+        _ = try ev(.parsing, try p.next());
+        _ = try ev(.strongs, try p.next());
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Δαυεὶδ", v.word.word);
+        _ = try ev(.parsing, try p.next());
+        _ = try ev(.strongs, try p.next());
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("υἱοῦ", v.word.word);
+        _ = try ev(.parsing, try p.next());
+        _ = try ev(.strongs, try p.next());
+        v = try ev(.verse, try p.next());
+        try expectEqual(.revelation, v.verse.book);
+        try expectEqual(9, v.verse.chapter);
+        try expectEqual(2, v.verse.verse);
+        v = try ev(.word, try p.next());
+        try expectEqualStrings("Ἀβραάμ.", v.word.text);
+        try expectEqualStrings("Ἀβραάμ", v.word.word);
     }
 }
 
@@ -369,7 +384,7 @@ test "test_parse_nestle_files" {
         if (.eof == token) {
             break;
         }
-        if (.unexpected_character == token) {
+        if (.invalid_token == token) {
             try std.testing.expect(false);
             break;
         }
@@ -385,8 +400,10 @@ const Reference = praxis.Reference;
 const parse_tag = praxis.parse;
 
 const modules = @import("modules.zig");
-const TextToken = modules.TextToken;
+const Token = modules.Token;
 const load_file_bytes = modules.load_file_bytes;
 
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
+const ee = std.testing.expectEqual;
+const ev = @import("byzantine.zig").ev;
