@@ -27,6 +27,12 @@ pub fn main() !void {
     try module.read(allocator, &sbl_reader);
     try module.saveText(allocator);
     try module.saveBinary(allocator);
+
+    module = Module.init();
+    var kjtr_reader = try kjtr.reader().init(allocator);
+    try module.read(allocator, &kjtr_reader);
+    try module.saveText(allocator);
+    try module.saveBinary(allocator);
 }
 
 const std = @import("std");
@@ -41,3 +47,4 @@ const nestle = @import("nestle.zig");
 
 // Additional modules that are not public domain
 const sbl = @import("sbl.zig");
+const kjtr = @import("kjtr.zig");

@@ -23,8 +23,8 @@ pub fn reader() type {
             const dir = try std.fs.cwd().openDir(folder, .{ .iterate = false });
             const data = try load_file_bytes(allocator, dir, files[0]);
             var parser = SblParser.init(data);
-            parser.reference.module = .sbl;
-            parser.reference.book = extract_book_from_filename(sbl_book_name(files[0]));
+            parser.current_verse.module = .sbl;
+            parser.current_verse.book = extract_book_from_filename(sbl_book_name(files[0]));
             return .{
                 .data = data,
                 .parser = parser,
@@ -36,26 +36,14 @@ pub fn reader() type {
             allocator.free(self.data);
         }
 
-        pub fn value(self: *Self) ![]const u8 {
-            return self.parser.value;
-        }
-
-        pub fn word(self: *Self) ![]const u8 {
-            return self.parser.word;
-        }
-
-        pub fn greek(self: *Self) []const u8 {
-            return self.parser.word;
-        }
-
-        pub fn next(self: *Self, allocator: Allocator) !TextToken {
+        pub fn next(self: *Self, allocator: Allocator) !Token {
             var token = try self.parser.next();
             if (token == .eof and self.files_index < files.len) {
                 const dir = try std.fs.cwd().openDir(folder, .{});
                 allocator.free(self.data);
                 self.data = try load_file_bytes(allocator, dir, files[self.files_index]);
                 self.parser = SblParser.init(self.data);
-                self.parser.reference.book = extract_book_from_filename(sbl_book_name(files[self.files_index]));
+                self.parser.current_verse.book = extract_book_from_filename(sbl_book_name(files[self.files_index]));
                 token = try self.parser.next();
                 self.files_index += 1;
             }
@@ -66,14 +54,6 @@ pub fn reader() type {
             return praxis.Module.sbl;
         }
 
-        pub fn reference(self: *Self) praxis.Reference {
-            return self.parser.reference;
-        }
-
-        pub fn punctuation(self: *Self) ?[]const u8 {
-            return self.parser.punctuation();
-        }
-
         pub fn debug_slice(self: *Self) []const u8 {
             return self.parser.debug_slice();
         }
@@ -81,25 +61,17 @@ pub fn reader() type {
 }
 
 const SblParser = struct {
-    /// This is a pointer to the data buffer that is advanced as we read.
-    data: []const u8,
-
     /// A pointer to the original buffer.
     original: []const u8,
 
-    /// The text value of each recognised token
-    value: []const u8,
-
-    /// If a token is a `word`, then this variable contains
-    /// the word minus any punctuation.
-    word: []const u8,
+    /// This is a pointer to the data buffer that is advanced as we read.
+    data: []const u8,
 
     /// Internal state tracking of variant markers.
     column: u8,
 
     /// Track which verse we are reading
-    verse_tag: []const u8,
-    reference: Reference = undefined,
+    current_verse: Reference = undefined,
 
     /// Reads token from the input data byte array. The array may
     /// be destructively modified in the process of reading it.
@@ -107,11 +79,8 @@ const SblParser = struct {
         return .{
             .data = data,
             .original = data,
-            .value = "",
-            .word = "",
             .column = 0,
-            .verse_tag = "",
-            .reference = .{
+            .current_verse = .{
                 .module = .sbl,
                 .book = .unknown,
                 .chapter = 0,
@@ -121,16 +90,14 @@ const SblParser = struct {
         };
     }
 
-    pub fn next(self: *SblParser) !TextToken {
-        if (self.data.len == 0) return .eof;
-        self.value = self.data;
+    pub fn next(self: *SblParser) !Token {
+        if (self.data.len == 0) return .{ .eof = {} };
 
         if (false) {
             // Current version does not include paragraphs
             const lines = self.skip_space();
             if (lines > 1) {
-                self.value.len = self.data.ptr - self.value.ptr;
-                return .paragraph;
+                return .{ .paragraph = {} };
             }
         }
 
@@ -141,16 +108,25 @@ const SblParser = struct {
             if (self.data.len < 6) {
                 return error.unexpected_character;
             }
-            self.value = self.data[0..6];
-            self.word = self.value;
+            const value = self.data[0..6];
             self.column = 19;
-            if (!std.mem.eql(u8, self.value, self.verse_tag)) {
-                const book_no: u16 = (self.data[0] - '0') * 10 + (self.data[1] - '0');
-                self.reference.book = try praxis.Book.from_u16(book_no + 39);
-                self.reference.chapter = (self.data[2] - '0') * 10 + (self.data[3] - '0');
-                self.reference.verse = (self.data[4] - '0') * 10 + (self.data[5] - '0');
-                self.verse_tag = self.value;
-                return .verse;
+            if (!is_ascii_digit(value[0]) or !is_ascii_digit(value[1]) or
+                !is_ascii_digit(value[2]) or !is_ascii_digit(value[3]) or
+                !is_ascii_digit(value[4]) or !is_ascii_digit(value[5]))
+            {
+                return .{ .invalid_token = value };
+            }
+            const book_no: u16 = (self.data[0] - '0') * 10 + (self.data[1] - '0');
+            const ref: Reference = .{
+                .module = self.current_verse.module,
+                .book = try praxis.Book.from_u16(book_no + 39),
+                .chapter = (self.data[2] - '0') * 10 + (self.data[3] - '0'),
+                .verse = (self.data[4] - '0') * 10 + (self.data[5] - '0'),
+            };
+            if (!ref.eql(&self.current_verse)) {
+                // If this is a new verse, send it.
+                self.current_verse = ref;
+                return .{ .verse = ref };
             }
         }
 
@@ -160,24 +136,24 @@ const SblParser = struct {
 
                 // Read a word into the `word` value,
                 // not including any punctuation.
-                self.word = self.data[19..];
+                var word = self.data[19..];
                 var j: usize = 0;
-                while (j < self.word.len and
-                    !is_eol(self.word[j]) and
-                    !is_ascii_whitespace(self.word[j]) and
-                    !is_sbl_punctuation(self.word[j]))
+                while (j < word.len and
+                    !is_eol(word[j]) and
+                    !is_ascii_whitespace(word[j]) and
+                    !is_sbl_punctuation(word[j]))
                     j += 1;
-                self.word.len = j;
+                word.len = j;
 
                 // Extend the value to contain the word and any punctuation.
-                self.value = self.data[19..];
+                var value = self.data[19..];
                 var i: usize = j;
-                while (i < self.value.len and is_sbl_punctuation(self.value[i]))
+                while (i < value.len and is_sbl_punctuation(value[i]))
                     i += 1;
-                self.value.len = i;
+                value.len = i;
 
                 self.column = 7;
-                return .word;
+                return .{ .word = .{ .word = word, .text = value } };
             }
             return error.unexpected_character;
         }
@@ -185,18 +161,21 @@ const SblParser = struct {
         // Send the parsing column third
         if (self.column == 7) {
             if (self.data.len >= 18) {
-                self.value = self.data[7..18];
-                self.word = self.value;
-                // Advance to next line before returning.
+                const value = self.data[7..18];
+                const parsing = parse_tag(value) catch |f| {
+                    std.log.err("Invalid parsing string {s}. Error {any}", .{ value, f });
+                    return .{ .invalid_token = value };
+                };
+                // We have the value. Now advance to next line before returning.
                 self.column = 0;
                 while (self.data.len > 0 and !is_eol(self.data[0])) {
                     self.advance();
                 }
                 if (self.data.len > 0 and is_eol(self.data[0]))
                     self.advance();
-                return .parsing;
+                return .{ .parsing = parsing };
             }
-            return error.unexpected_character;
+            return .{ .invalid_token = "" };
         }
 
         // Reaching this point indicates a bug in the above algorithm.
@@ -258,6 +237,10 @@ fn is_ascii_whitespace(c: u8) bool {
     return (c <= 32);
 }
 
+fn is_ascii_digit(c: u8) bool {
+    return (c >= '0' and c <= '9');
+}
+
 fn is_eol(c: u8) bool {
     return c == '\n' or c == '\r';
 }
@@ -276,10 +259,10 @@ fn sbl_book_name(name: []const u8) []const u8 {
 
 test "basic" {
     var p = SblParser.init(&"010101 N- ----NSF- Βίβλος Βίβλος βίβλος βίβλος".*);
-    try ee(.verse, p.next());
-    try ee(.word, p.next());
-    try ee(.parsing, p.next());
-    try ee(.eof, p.next());
+    var v = try ev(.verse, try p.next());
+    _ = try ev(.word, try p.next());
+    _ = try ev(.parsing, try p.next());
+    _ = try ev(.eof, try p.next());
 
     p = SblParser.init(&
         \\010101 N- ----NSF- Βίβλος Βίβλος βίβλος βίβλος
@@ -287,31 +270,29 @@ test "basic" {
         \\010101 N- ----GSM- Ἰησοῦ, Ἰησοῦ Ἰησοῦ Ἰησοῦς
         \\122334 N- ----NSF- Βίβλος Βίβλος βίβλος βίβλος
     .*);
-    try ee(.verse, p.next());
-    try es("010101", p.value);
-    try ee(praxis.Book.matthew, p.reference.book);
-    try ee(1, p.reference.chapter);
-    try ee(1, p.reference.verse);
-    try ee(.word, p.next());
-    try es("Βίβλος", p.word);
-    try es("Βίβλος", p.value);
-    try ee(.parsing, p.next());
-    try ee(.word, p.next());
-    try es("γενέσεως", p.word);
-    try es("γενέσεως", p.value);
-    try ee(.parsing, p.next());
-    try ee(.word, p.next());
-    try es("Ἰησοῦ,", p.value);
-    try es("Ἰησοῦ", p.word);
-    try ee(.parsing, p.next());
-    try ee(.verse, p.next());
-    try es("122334", p.value);
-    try ee(praxis.Book.colossians, p.reference.book);
-    try ee(23, p.reference.chapter);
-    try ee(34, p.reference.verse);
-    try ee(.word, p.next());
-    try ee(.parsing, p.next());
-    try ee(.eof, p.next());
+    v = try ev(.verse, try p.next());
+    try ee(praxis.Book.matthew, v.verse.book);
+    try ee(1, v.verse.chapter);
+    try ee(1, v.verse.verse);
+    v = try ev(.word, try p.next());
+    try es("Βίβλος", v.word.word);
+    try es("Βίβλος", v.word.text);
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("γενέσεως", v.word.word);
+    try es("γενέσεως", v.word.text);
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("Ἰησοῦ,", v.word.text);
+    try es("Ἰησοῦ", v.word.word);
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.verse, try p.next());
+    try ee(praxis.Book.colossians, v.verse.book);
+    try ee(23, v.verse.chapter);
+    try ee(34, v.verse.verse);
+    _ = try ev(.word, try p.next());
+    _ = try ev(.parsing, try p.next());
+    _ = try ev(.eof, try p.next());
 }
 
 test "test_parse_sbl_files" {
@@ -359,12 +340,13 @@ const betacode_to_greek = praxis.betacode_to_greek;
 
 const modules = @import("modules.zig");
 const load_file_bytes = modules.load_file_bytes;
-const TextToken = modules.TextToken;
 const Module = modules.Module;
 const Paragraph = modules.Paragraph;
 const Verse = modules.Verse;
 const Word = modules.Word;
+const Token = modules.Token;
 const extract_book_from_filename = modules.extract_book_from_filename;
 
 const ee = std.testing.expectEqual;
 const es = std.testing.expectEqualStrings;
+const ev = @import("byzantine.zig").ev;

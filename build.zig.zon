@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .praxis = .{
-            .url = "git+https://github.com/loftafi/praxis.git#c25dcc7c7c2543463b9a1d71688f87ad48fc2e01",
-            .hash = "praxis-0.1.7-FPf2Ne_YBABL4KXk3gLQctCeuJPNvdzo6lHTIN9CU9Xd",
+            .url = "git+https://github.com/loftafi/praxis.git#90a30d36bb353463aac24be63c4bfe774c936896",
+            .hash = "praxis-0.1.9-FPf2NfICBQBMY9W5PS8lrNNEpD1yvWrMI1ouVj0jflST",
         },
     },
     .paths = .{
