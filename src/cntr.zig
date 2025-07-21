@@ -27,11 +27,11 @@ pub fn reader() type {
 
         pub fn init(
             allocator: Allocator,
-            module_tag: Module,
+            module_tag: praxis.Module,
         ) !Self {
             const dir = try std.fs.cwd().openDir(folder, .{});
             const data = try load_file_bytes(allocator, dir, file);
-            var parser = CntrParser.init(data);
+            var parser = CntrParser.init(data, module_tag);
             parser.current_verse.module = module_tag;
             return .{
                 .data = data,
@@ -76,7 +76,7 @@ const CntrParser = struct {
 
     /// Reads token from the input data byte array. The array may
     /// be destructively modified in the process of reading it.
-    pub fn init(data: []const u8, module_tag: Module) CntrParser {
+    pub fn init(data: []const u8, module_tag: praxis.Module) CntrParser {
         return .{
             .data = data,
             .original = data,
@@ -98,15 +98,14 @@ const CntrParser = struct {
             return t;
         }
 
-        if (self.data.len == 0) return .{ .eof = {} };
-
-        if (false) {
-            // Current version does not include paragraphs
-            const lines = self.skip_space();
-            if (lines > 1) {
-                return .{ .paragraph = {} };
+        if (self.column == 0) {
+            // Skip lines that don't start with numbers
+            if (self.data.len > 0 and !is_ascii_digit(self.data[0])) {
+                self.skip_comment_line();
             }
         }
+
+        if (self.data.len == 0) return .{ .eof = {} };
 
         // Send the verse column/tag first.
         //
@@ -123,12 +122,12 @@ const CntrParser = struct {
             {
                 return .{ .invalid_token = value };
             }
-            const book_no: u16 = (self.data[0] - '0') * 10 + (self.data[1] - '0');
+            const book_no: u16 = (value[0] - '0') * 10 + (value[1] - '0');
             const ref: Reference = .{
                 .module = self.current_verse.module,
-                .book = try praxis.Book.from_u16(book_no + 39),
-                .chapter = (self.data[2] - '0') * 100 + (self.data[3]) * 10 + (self.data[4] - '0'),
-                .verse = (self.data[5] - '0') * 100 + (self.data[6] - '0') * 10 + (self.data[7] - '0'),
+                .book = try praxis.Book.from_u16(book_no),
+                .chapter = (value[2] - '0') * 100 + (value[3] - '0') * 10 + (value[4] - '0'),
+                .verse = (value[5] - '0') * 100 + (value[6] - '0') * 10 + (value[7] - '0'),
             };
             self.column += 1;
             if (!ref.eql(&self.current_verse)) {
@@ -136,6 +135,7 @@ const CntrParser = struct {
                 self.current_verse = ref;
                 return .{ .verse = ref };
             }
+            value = self.read_field();
         }
 
         if (self.column == 1) {
@@ -145,13 +145,13 @@ const CntrParser = struct {
                 value = value[m..];
                 self.carryover = .{ .word = .{
                     .text = value,
-                    .word = value,
+                    .word = punctuation(value),
                 } };
                 return .{ .paragraph = {} };
             }
             return .{ .word = .{
                 .text = value,
-                .word = value,
+                .word = punctuation(value),
             } };
         }
 
@@ -166,20 +166,35 @@ const CntrParser = struct {
 
         if (self.column == 4) {
             self.column += 1;
-            return .{ .strongs = [2]u16{ 0, 0 } };
+            var field = value;
+            var sn1: u16 = 0;
+            while (field.len > 0 and is_ascii_digit(field[0])) {
+                sn1 = sn1 * 10 + (field[0] - '0');
+                field = field[1..];
+            }
+            return .{ .strongs = [2]u16{ sn1, 0 } };
         }
 
         self.column = 0;
 
-        // Merge crrent and next field
+        // Merge current and next field
         const value2 = self.read_field();
         value.len = value2.ptr + value2.len - value.ptr;
 
         const parsing = parse_tag(value) catch |f| {
-            std.log.err("Invalid parsing string {s}. Error {s}", .{ value, f });
+            std.log.err("Invalid parsing string {s}. Error {any}", .{ value, f });
             return .{ .invalid_token = value };
         };
         return .{ .parsing = parsing };
+    }
+
+    fn skip_comment_line(self: *CntrParser) void {
+        while (self.data.len > 0 and !is_eol(self.data[0])) {
+            self.data = self.data[1..];
+        }
+        while (self.data.len > 0 and is_eol(self.data[0])) {
+            self.data = self.data[1..];
+        }
     }
 
     /// Pass over whitespace and comments. Return the number of lines skipped.
@@ -192,21 +207,19 @@ const CntrParser = struct {
             if (is_ascii_whitespace(self.data[0])) {
                 if (self.data[0] == '\n') cr += 1;
                 if (self.data[0] == '\r') lf += 1;
-                self.advance();
+                self.data = self.data[1..];
                 continue;
             }
             if (self.data[0] == '#') {
                 while (self.data.len > 0 and !is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 if (self.data[0] == '\n' and (self.data.len > 1 and self.data[1] == '\r')) {
-                    self.advance();
-                    self.advance();
+                    self.data = self.data[2..];
                 } else if (self.data[0] == '\r' and (self.data.len > 1 and self.data[1] == '\n')) {
-                    self.advance();
-                    self.advance();
+                    self.data = self.data[2..];
                 } else if (self.data.len > 0 and is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 continue;
             }
@@ -215,14 +228,8 @@ const CntrParser = struct {
         return @max(cr, lf);
     }
 
-    inline fn advance(self: *CntrParser) void {
-        self.data.len -= 1;
-        self.data.ptr += 1;
-    }
-
     fn read_field(self: *CntrParser) []const u8 {
         _ = self.skip_space();
-        var word: []const u8 = "";
         var value: []u8 = @constCast(self.data);
         value.len = 0;
         var end: usize = 0;
@@ -234,7 +241,7 @@ const CntrParser = struct {
                 end = value.len + 1;
             }
             value.len += 1;
-            self.advance();
+            self.data = self.data[1..];
         }
         value.len = end;
         if (std.mem.endsWith(u8, value, "’")) {
@@ -243,14 +250,13 @@ const CntrParser = struct {
             value[value.len - 2] = a[1];
             value[value.len - 1] = a[2];
         }
-        word = value;
         if (self.data.len > 0) {
             if (self.data[0] == '\t') {
-                self.advance();
+                self.data = self.data[1..];
             } else if (self.data[0] == '\n') {
-                self.advance();
+                self.data = self.data[1..];
             } else if (self.data[0] == '\r') {
-                self.advance();
+                self.data = self.data[1..];
             }
         }
         return value;
@@ -266,7 +272,7 @@ const CntrParser = struct {
 // Return a version of a string without trailing punctuation.
 pub fn punctuation(text: []const u8) []const u8 {
     var word = text;
-    while (word.len > 1 and is_kjtr_punctuation(word[word.len - 1])) {
+    while (word.len > 1 and is_cntr_punctuation(word[word.len - 1])) {
         word.len -= 1;
     }
     return word;
@@ -285,51 +291,79 @@ fn is_eol(c: u8) bool {
 }
 
 // Conservatively only accept punctuation we have seen in data sources.
-fn is_kjtr_punctuation(c: u8) bool {
-    return c == ':' or c == '.' or c == ',' or c == ';' or c == '-';
+fn is_cntr_punctuation(c: u8) bool {
+    return c == ':' or c == '.' or c == ',' or c == ';' or c == '-' or c == '!';
 }
 
-test "basic" {
-    var p = CntrParser.init(&"010101 N- ----NSF- Βίβλος Βίβλος βίβλος βίβλος".*);
+test "cntr_basic" {
+    var p = CntrParser.init(&"40001001\t¶Βίβλος\tβιβλοσ\tβίβλος\t9760\tN\t....NFS ".*, .kjtr);
     var v = try ev(.verse, try p.next());
+    _ = try ev(.paragraph, try p.next());
     _ = try ev(.word, try p.next());
+    _ = try ev(.strongs, try p.next());
     _ = try ev(.parsing, try p.next());
     _ = try ev(.eof, try p.next());
 
-    p = CntrParser.init(&
-        \\40001001\t¶Βίβλος\tβιβλοσ\tβίβλος\t9760\tN\t....NFS
-        \\40001001\tγενέσεως\tγενεσεωσ\tγένεσις\t10780\tN\t....GFS
-        \\40001001\tἸησοῦ\t=ιυ\tἸησοῦς\t24240\tN\t....GMS
-        \\51023034\tΧριστοῦ,\t=χυ\tχριστός\t55470\tN\t....GMS
-    .*);
+    p = CntrParser.init(&("40001001\t¶Βίβλος\tβιβλοσ\tβίβλος\t9760\tN\t....NFS\n" ++
+        "40001001\tγενέσεως\tγενεσεωσ\tγένεσις\t10780\tN\t....GFS\n" ++
+        "40001001\tἸησοῦ.\t=ιυ\tἸησοῦς\t24240\tN\t....GMS\n" ++
+        "51023034\tΧριστοῦ,\t=χυ\tχριστός\t55470\tN\t....GMS\n").*, .sr);
     v = try ev(.verse, try p.next());
-    try ee(praxis.Book.matthew, v.book);
-    try ee(1, p.chapter);
-    try ee(1, p.verse);
-    _ = try ee(.paragraph, try p.next());
-    v = try ee(.word, try p.next());
-    try es("Βίβλος", p.word);
-    try es("Βίβλος", p.value);
-    _ = try ee(.parsing, try p.next());
-    _ = try ee(.word, try p.next());
-    try es("γενέσεως", p.word);
-    try es("γενέσεως", p.value);
-    _ = try ee(.parsing, try p.next());
-    v = try ee(.word, try p.next());
-    try es("Ἰησοῦ,", p.value);
-    try es("Ἰησοῦ", p.word);
-    _ = try ee(.parsing, try p.next());
-    v = try ee(.word, try p.next());
-    try es("Χριστοῦ,", p.value);
-    try es("Χριστοῦ", p.word);
-    _ = try ee(.parsing, try p.next());
-    v = try ee(.verse, try p.next());
-    try ee(praxis.Book.colossians, p.book);
-    try ee(23, p.chapter);
-    try ee(34, p.verse);
-    _ = try ee(.word, try p.next());
-    _ = try ee(.parsing, try p.next());
-    _ = try ee(.eof, try p.next());
+    try ee(praxis.Book.matthew, v.verse.book);
+    try ee(1, v.verse.chapter);
+    try ee(1, v.verse.verse);
+    _ = try ev(.paragraph, try p.next());
+    v = try ev(.word, try p.next());
+    try es("Βίβλος", v.word.word);
+    try es("Βίβλος", v.word.text);
+    v = try ev(.strongs, try p.next());
+    try ee(9760, v.strongs[0]);
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("γενέσεως", v.word.word);
+    try es("γενέσεως", v.word.text);
+    v = try ev(.strongs, try p.next());
+    try ee(10780, v.strongs[0]);
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.word, try p.next());
+    try es("Ἰησοῦ", v.word.word);
+    try es("Ἰησοῦ.", v.word.text);
+    v = try ev(.strongs, try p.next());
+    try ee(24240, v.strongs[0]);
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.verse, try p.next());
+    try ee(praxis.Book.colossians, v.verse.book);
+    try ee(23, v.verse.chapter);
+    try ee(34, v.verse.verse);
+    v = try ev(.word, try p.next());
+    try es("Χριστοῦ", v.word.word);
+    try es("Χριστοῦ,", v.word.text);
+    v = try ev(.strongs, try p.next());
+    try ee(55470, v.strongs[0]);
+    _ = try ev(.parsing, try p.next());
+    _ = try ev(.eof, try p.next());
+}
+
+test "special_punctuation" {
+    var p = CntrParser.init(&("42019040\tκράξουσιν.”\tκραξουσιν\tκράζω\t28960\tV\tIFA3..P\n" ++
+        "42019041\t¶Καὶ\tκαι\tκαί\t25320\tC\t.......").*, .kjtr);
+    var v = try ev(.verse, try p.next());
+    try ee(19, v.verse.chapter);
+    v = try ev(.word, try p.next());
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.parsing, try p.next());
+    v = try ev(.verse, try p.next());
+    try ee(19, v.verse.chapter);
+    _ = try ev(.paragraph, try p.next());
+    v = try ev(.word, try p.next());
+    _ = try ev(.strongs, try p.next());
+    _ = try ev(.parsing, try p.next());
+    _ = try ev(.eof, try p.next());
+}
+
+test "chop_punctuation" {
+    try es("hello", punctuation("hello."));
+    try es("και", punctuation("και,"));
 }
 
 test "test_parse_kjtr_file" {
@@ -366,18 +400,18 @@ const std = @import("std");
 const BoundedArray = std.BoundedArray;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const warn = std.log.warn;
+const err = std.log.err;
 const Allocator = std.mem.Allocator;
 
 const praxis = @import("praxis");
 const Parsing = praxis.Parsing;
 const Reference = praxis.Reference;
 const BetacodeType = praxis.BetacodeType;
-const parse_tag = praxis.parse;
+const parse_tag = praxis.parse_cntr;
 const betacode_to_greek = praxis.betacode_to_greek;
 
 const modules = @import("modules.zig");
 const load_file_bytes = modules.load_file_bytes;
-const Module = modules.Module;
 const Paragraph = modules.Paragraph;
 const Verse = modules.Verse;
 const Word = modules.Word;

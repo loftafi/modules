@@ -9,6 +9,9 @@ test {
     std.testing.refAllDecls(nestle);
 
     // Additional modules that are not public domain.
-    const sbl = @import("sbl.zig");
-    std.testing.refAllDecls(sbl);
+    const cntr = @import("cntr.zig");
+    std.testing.refAllDecls(cntr);
+
+    //const sbl = @import("sbl.zig");
+    //std.testing.refAllDecls(sbl);
 }
