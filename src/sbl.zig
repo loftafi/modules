@@ -335,7 +335,7 @@ const praxis = @import("praxis");
 const Parsing = praxis.Parsing;
 const Reference = praxis.Reference;
 const BetacodeType = praxis.BetacodeType;
-const parse_tag = praxis.parse;
+const parse_tag = praxis.parse_morphgnt;
 const betacode_to_greek = praxis.betacode_to_greek;
 
 const modules = @import("modules.zig");

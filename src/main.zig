@@ -22,11 +22,11 @@ pub fn main() !void {
     try module.saveBinary(allocator);
 
     // Additional non-public domain modules
-    //module = Module.init();
-    //var sbl_reader = try sbl.reader().init(allocator);
-    //try module.read(allocator, &sbl_reader);
-    //try module.saveText(allocator);
-    //try module.saveBinary(allocator);
+    module = Module.init();
+    var sbl_reader = try sbl.reader().init(allocator);
+    try module.read(allocator, &sbl_reader);
+    try module.saveText(allocator);
+    try module.saveBinary(allocator);
 
     module = Module.init();
     var sr_reader = try cntr.reader().init(allocator, praxis.Module.sr);
@@ -52,5 +52,5 @@ const byzantine = @import("byzantine.zig");
 const nestle = @import("nestle.zig");
 
 // Additional modules that are not public domain
-//const sbl = @import("sbl.zig");
+const sbl = @import("sbl.zig");
 const cntr = @import("cntr.zig");
