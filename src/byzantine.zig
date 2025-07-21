@@ -451,15 +451,6 @@ fn is_paragraph_tag(c: u8) bool {
     return c == 'p' or c == 'P' or c == 'π' or c == 'Π';
 }
 
-// Test equals helper
-pub fn ev(a: TokenType, b: Token) !Token {
-    if (a == b) {
-        return b;
-    }
-    std.log.err("Expected {s}={any}", .{ @tagName(a), b });
-    return error.IncorrectTokenTypeReturned;
-}
-
 test "basic" {
     var p = ByzParser.init(&"   22".*, .mark);
     _ = try ev(.strongs, try p.next());
@@ -718,3 +709,4 @@ const extract_book_from_filename = modules.extract_book_from_filename;
 
 const ee = std.testing.expectEqual;
 const es = std.testing.expectEqualStrings;
+const ev = @import("test.zig").ev;
