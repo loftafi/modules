@@ -39,6 +39,12 @@ pub fn main() !void {
     try module.read(allocator, &kjtr_reader);
     try module.saveText(allocator);
     try module.saveBinary(allocator);
+
+    module = Module.init();
+    var ccat_reader = try cntr.reader().init(allocator, praxis.Module.ccat);
+    try module.read(allocator, &ccat_reader);
+    try module.saveText(allocator);
+    try module.saveBinary(allocator);
 }
 
 const std = @import("std");
@@ -54,3 +60,4 @@ const nestle = @import("nestle.zig");
 // Additional modules that are not public domain
 const sbl = @import("sbl.zig");
 const cntr = @import("cntr.zig");
+const ccat = @import("ccat.zig");
