@@ -12,6 +12,12 @@ pub const files = [_][]const u8{
     "85-3Jn-morphgnt.txt", "86-Jud-morphgnt.txt", "87-Re-morphgnt.txt",
 };
 
+const verse_column: usize = 0;
+const verse_column_width: usize = 6;
+const parsing_column: usize = 7;
+const word_column: usize = 19;
+
+/// Read book tokens from the SBL data set files.
 pub fn reader() type {
     return struct {
         const Self = @This();
@@ -104,12 +110,12 @@ const SblParser = struct {
         // Send the verse column/tag first.
         //
         //   010101 N- ----NSF- Βίβλος Βίβλος βίβλος βίβλος
-        if (self.column == 0) {
-            if (self.data.len < 6) {
+        if (self.column == verse_column) {
+            if (self.data.len < verse_column_width) {
                 return error.unexpected_character;
             }
-            const value = self.data[0..6];
-            self.column = 19;
+            const value = self.data[0..verse_column_width];
+            self.column = word_column;
             if (!is_ascii_digit(value[0]) or !is_ascii_digit(value[1]) or
                 !is_ascii_digit(value[2]) or !is_ascii_digit(value[3]) or
                 !is_ascii_digit(value[4]) or !is_ascii_digit(value[5]))
@@ -131,12 +137,12 @@ const SblParser = struct {
         }
 
         // Send the word token second.
-        if (self.column == 19) {
-            if (self.data.len >= 20) {
+        if (self.column == word_column) {
+            if (self.data.len > word_column) {
 
                 // Read a word into the `word` value,
                 // not including any punctuation.
-                var word = self.data[19..];
+                var word = self.data[word_column..];
                 var j: usize = 0;
                 while (j < word.len and
                     !is_eol(word[j]) and
@@ -146,22 +152,22 @@ const SblParser = struct {
                 word.len = j;
 
                 // Extend the value to contain the word and any punctuation.
-                var value = self.data[19..];
+                var value = self.data[word_column..];
                 var i: usize = j;
                 while (i < value.len and is_sbl_punctuation(value[i]))
                     i += 1;
                 value.len = i;
 
-                self.column = 7;
+                self.column = parsing_column;
                 return .{ .word = .{ .word = word, .text = value } };
             }
             return error.unexpected_character;
         }
 
         // Send the parsing column third
-        if (self.column == 7) {
-            if (self.data.len >= 18) {
-                const value = self.data[7..18];
+        if (self.column == parsing_column) {
+            if (self.data.len > word_column) {
+                const value = self.data[parsing_column..18];
                 const parsing = parse_tag(value) catch |f| {
                     std.log.err("Invalid parsing string {s}. Error {any}", .{ value, f });
                     return .{ .invalid_token = value };
@@ -169,10 +175,10 @@ const SblParser = struct {
                 // We have the value. Now advance to next line before returning.
                 self.column = 0;
                 while (self.data.len > 0 and !is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 if (self.data.len > 0 and is_eol(self.data[0]))
-                    self.advance();
+                    self.data = self.data[1..];
                 return .{ .parsing = parsing };
             }
             return .{ .invalid_token = "" };
@@ -192,32 +198,25 @@ const SblParser = struct {
             if (is_ascii_whitespace(self.data[0])) {
                 if (self.data[0] == '\n') cr += 1;
                 if (self.data[0] == '\r') lf += 1;
-                self.advance();
+                self.data = self.data[1..];
                 continue;
             }
             if (self.data[0] == '#') {
                 while (self.data.len > 0 and !is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 if (self.data[0] == '\n' and (self.data.len > 1 and self.data[1] == '\r')) {
-                    self.advance();
-                    self.advance();
+                    self.data = self.data[2..];
                 } else if (self.data[0] == '\r' and (self.data.len > 1 and self.data[1] == '\n')) {
-                    self.advance();
-                    self.advance();
+                    self.data = self.data[2..];
                 } else if (self.data.len > 0 and is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 continue;
             }
             break;
         }
         return @max(cr, lf);
-    }
-
-    inline fn advance(self: *SblParser) void {
-        self.data.len -= 1;
-        self.data.ptr += 1;
     }
 
     pub fn punctuation(self: *SblParser) ?[]const u8 {

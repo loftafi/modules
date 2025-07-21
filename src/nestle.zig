@@ -1,3 +1,10 @@
+//! Read the nestle data file.
+//!
+//!  BCV        text     func_morph  form_morph  strongs lemma   normalized
+//!  Matt 1:1   Βίβλος   N-NSF   N-NSF   976     βίβλος  Βίβλος
+//!  Matt 1:1   γενέσεως N-GSF   N-GSF   1078    γένεσις γενέσεως
+//!  Matt 1:1   Ἰησοῦ    N-GSM   N-GSM   2424    Ἰησοῦς  Ἰησοῦ
+
 const filename = "Nestle1904.csv";
 const folder = "resources/nestle1904";
 
@@ -44,7 +51,7 @@ const NestleParser = struct {
     original: []const u8 = "",
 
     // The Nestle data is 6 columns per line.
-    column: usize = 0,
+    column: Column = .verse,
 
     current_verse: Reference = .unknown,
 
@@ -54,7 +61,7 @@ const NestleParser = struct {
         return .{
             .data = data[0..data.len],
             .original = data,
-            .column = 0,
+            .column = .verse,
             .current_verse = .{
                 .module = .nestle,
                 .book = .unknown,
@@ -71,7 +78,7 @@ const NestleParser = struct {
         var value = self.read_field();
 
         // If first column is "BCV" this is a header row, skip it.
-        if (self.column == 0 and std.mem.eql(u8, "BCV", value)) {
+        if (self.column == .verse and std.mem.eql(u8, "BCV", value)) {
             _ = self.read_field();
             _ = self.read_field();
             _ = self.read_field();
@@ -82,9 +89,9 @@ const NestleParser = struct {
         }
 
         // Depending on the column, a different token type is returned.
-        self.column += 1;
         switch (self.column) {
-            1 => {
+            .verse => {
+                self.column = .text;
                 var reference = praxis.parse_reference(value) catch |f| {
                     std.log.err("Failed parsing {s}. {any}", .{ value, f });
                     return .{ .invalid_token = value };
@@ -96,30 +103,32 @@ const NestleParser = struct {
                 }
                 return self.next();
             },
-            2 => {
+            .text => {
+                self.column = .func_parsing;
                 return .{ .word = .{
                     .text = value,
                     .word = remove_punctuation(value),
                 } };
             },
-            3 => {
+            .normalised => unreachable,
+            .lemma => unreachable,
+            .func_parsing => {
+                self.column = .strongs; // skip form parsing column
                 value = self.read_field();
                 const parsing = parse_tag(value) catch |f| {
                     std.log.err("Faild parsing {s}. {any}", .{ value, f });
                     return .{ .invalid_token = value };
                 };
-                self.column += 1; // skip column 4
                 return .{ .parsing = parsing };
             },
-            4 => unreachable,
-            5 => {
+            .form_parsing => unreachable,
+            .strongs => {
+                self.column = .verse;
                 // Skip last two columns
                 _ = self.read_field();
                 _ = self.read_field();
-                self.column = 0;
                 return self.read_strongs_field(value);
             },
-            else => unreachable,
         }
     }
 
@@ -257,6 +266,16 @@ fn is_eol(c: u8) bool {
 fn is_punctuation(c: u8) bool {
     return c == ':' or c == '.' or c == ',' or c == ';' or c == '-';
 }
+
+const Column = enum {
+    verse,
+    text,
+    func_parsing,
+    form_parsing,
+    strongs,
+    lemma,
+    normalised,
+};
 
 test "basic" {
     {

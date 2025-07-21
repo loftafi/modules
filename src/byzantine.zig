@@ -7,6 +7,7 @@ pub const files = [_][]const u8{
     "22_2PE", "23_1JO", "24_2JO", "25_3JO", "26_JUD", "27_REV",
 };
 
+/// Read tokens from the byzentane data files.
 pub fn reader() type {
     return struct {
         const Self = @This();
@@ -224,7 +225,7 @@ const ByzParser = struct {
             var x: u16 = 0;
             while (self.data.len > 0 and is_ascii_digit(self.data[0])) {
                 x = (x * 10) + (self.data[0] - '0');
-                self.advance();
+                self.data = self.data[1..];
             }
             if (self.data.len == 0 or !is_verse_divider(self.data[0])) {
                 // It's a strongs number
@@ -239,14 +240,14 @@ const ByzParser = struct {
                 var reference = self.current_reference;
                 reference.chapter = x;
                 x = 0;
-                self.advance();
+                self.data = self.data[1..];
                 if (!is_ascii_digit(self.data[0])) {
                     value.len = self.data.ptr - value.ptr;
                     return .{ .invalid_token = value };
                 }
                 while (self.data.len > 0 and is_ascii_digit(self.data[0])) {
                     x = (x * 10) + (self.data[0] - '0');
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 reference.verse = x;
                 value.len = self.data.ptr - value.ptr;
@@ -264,7 +265,7 @@ const ByzParser = struct {
         if (is_ascii_betacode_start(self.data[0])) {
             self.data = self.data[1..];
             while (self.data.len > 0 and is_ascii_betacode(self.data[0])) {
-                self.advance();
+                self.data = self.data[1..];
             }
 
             // Grab ' at end of word to signify ellision
@@ -295,13 +296,13 @@ const ByzParser = struct {
 
         // Is it a paragraph mark?
         if (self.data[0] == '?') {
-            self.advance();
+            self.data = self.data[1..];
             return .{ .paragraph = {} };
         }
 
         // Is this a parsing tag
         if (self.data[0] == '{') {
-            self.advance();
+            self.data = self.data[1..];
             if (self.data.len > 1 and (self.data[0] == 'N' or
                 self.data[0] == 'B' or self.data[0] == 'C' or
                 self.data[0] == 'M' or self.data[0] == 'S' or
@@ -309,17 +310,17 @@ const ByzParser = struct {
             {
                 // B and N annotations can be skipped
                 while (self.data.len > 0 and self.data[0] != '}') {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 if (self.data.len > 0 and self.data[0] == '}') {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 return self.next();
             }
             _ = self.skip_space();
             value = self.data;
             while (self.data.len > 0 and is_parsing_letter(self.data[0])) {
-                self.advance();
+                self.data = self.data[1..];
             }
             value.len = self.data.ptr - value.ptr;
             if (value.len == 0) {
@@ -327,7 +328,7 @@ const ByzParser = struct {
             }
             _ = self.skip_space();
             if (self.data.len > 0 and self.data[0] == '}') {
-                self.advance();
+                self.data = self.data[1..];
                 if (value.len == 1 and is_paragraph_tag(value[0])) {
                     return .paragraph;
                 }
@@ -343,7 +344,7 @@ const ByzParser = struct {
         // Is this a variant marker?
         if (self.data[0] == '|') {
             const c = self.data[0..1];
-            self.advance();
+            self.data = self.data[1..];
             const tag: Token = switch (self.variant) {
                 0 => .{ .variant_mark = {} },
                 1 => .{ .variant_alt = {} },
@@ -368,32 +369,25 @@ const ByzParser = struct {
             if (is_ascii_whitespace(self.data[0])) {
                 if (self.data[0] == '\n') cr += 1;
                 if (self.data[0] == '\r') lf += 1;
-                self.advance();
+                self.data = self.data[1..];
                 continue;
             }
             if (self.data[0] == '#') {
                 while (self.data.len > 0 and !is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 if (self.data[0] == '\n' and (self.data.len > 1 and self.data[1] == '\r')) {
-                    self.advance();
-                    self.advance();
+                    self.data = self.data[2..];
                 } else if (self.data[0] == '\r' and (self.data.len > 1 and self.data[1] == '\n')) {
-                    self.advance();
-                    self.advance();
+                    self.data = self.data[2..];
                 } else if (self.data.len > 0 and is_eol(self.data[0])) {
-                    self.advance();
+                    self.data = self.data[1..];
                 }
                 continue;
             }
             break;
         }
         return @max(cr, lf);
-    }
-
-    inline fn advance(self: *ByzParser) void {
-        self.data.len -= 1;
-        self.data.ptr += 1;
     }
 
     pub fn debug_slice(self: *ByzParser) []const u8 {

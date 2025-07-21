@@ -90,7 +90,7 @@ const CcatParser = struct {
     data: []const u8,
 
     /// Internal state tracking of variant markers.
-    column: u8,
+    column: Column,
     mode: State,
 
     /// Track which verse we are reading
@@ -102,7 +102,7 @@ const CcatParser = struct {
         return .{
             .data = data,
             .original = data,
-            .column = 0,
+            .column = .text,
             .state = .verse,
             .current_verse = .{
                 .module = .ccat,
@@ -125,64 +125,68 @@ const CcatParser = struct {
             }
         }
 
-        if (self.mode == .verse) {
-            var text = self.data;
-            while (self.data.len > 0 and !is_eol(self.data[0])) {
-                self.data = self.data[1..];
-            }
-            text.len = self.data.ptr - text.ptr;
-            while (self.data.len > 0 and is_eol(self.data[0])) {
-                self.data = self.data[1..];
-            }
-            const ref = praxis.Book.parse(text) catch |f| {
-                err("Inknown reference: {s}.  Error: {any}", .{ text, f });
-                return .{ .invalid_token = text };
-            };
-            self.mode = .contents;
-            return .{ .verse = ref };
-        }
+        switch (self.mode) {
+            .verse => {
+                var text = self.data;
+                while (self.data.len > 0 and !is_eol(self.data[0])) {
+                    self.data = self.data[1..];
+                }
+                text.len = self.data.ptr - text.ptr;
+                while (self.data.len > 0 and is_eol(self.data[0])) {
+                    self.data = self.data[1..];
+                }
+                const ref = praxis.Book.parse(text) catch |f| {
+                    err("Inknown reference: {s}.  Error: {any}", .{ text, f });
+                    return .{ .invalid_token = text };
+                };
+                self.mode = .contents;
+                return .{ .verse = ref };
+            },
 
-        // Word appears first
-        //
-        //  *A)GAPH/SATE             VA  AAD2P  A)GAPA/W
-        if (self.column == 0) {
-            if (self.data.len < word_column_width) {
-                return error.InvalidLineLength;
-            }
-            const text = trim_whitespace(self.data[0..word_column_width]);
-            var buffer = std.BoundedArray(u8, praxis.MAX_WORD_SIZE).init(0);
-            const word = betacode_to_greek(text, .default, &buffer);
-            self.column = 1;
-            return .{ .word = .{ .word = word, .text = word } };
-        }
+            // Word appears first
+            //
+            //  *A)GAPH/SATE             VA  AAD2P  A)GAPA/W
+            .text => {
+                if (self.data.len < word_column_width) {
+                    return error.InvalidLineLength;
+                }
+                const text = trim_whitespace(self.data[0..word_column_width]);
+                var buffer = std.BoundedArray(u8, praxis.MAX_WORD_SIZE).init(0);
+                const word = betacode_to_greek(text, .default, &buffer);
+                self.column = .parsing;
+                return .{ .word = .{ .word = word, .text = word } };
+            },
 
-        // Send the parsing token second.
-        if (self.column == 1) {
-            if (self.data.len < parsing_column_width) {
-                return error.InvalidLineLength;
-            }
-            const text = self.data[0..parsing_column_width];
-            const parsing = parse_tag(text) catch |f| {
-                err("Invalid parsing string: {s} Error: {any}", .{ text, f });
-                return .{ .invalid_field = text };
-            };
-            return .{ .parsing = .{ .parsing = parsing } };
-        }
+            // Send the parsing token second.
+            .parsing => {
+                if (self.data.len < parsing_column_width) {
+                    return error.InvalidLineLength;
+                }
+                const text = self.data[0..parsing_column_width];
+                const parsing = parse_tag(text) catch |f| {
+                    err("Invalid parsing string: {s} Error: {any}", .{ text, f });
+                    return .{ .invalid_field = text };
+                };
+                self.column = .lexical_form;
+                return .{ .parsing = .{ .parsing = parsing } };
+            },
 
-        // Skip final column for now
-        while (self.data.len > 0 and !is_eol(self.data[0]))
-            self.data = self.data[1..];
-        var lines: usize = 0;
-        while (self.data.len > 0 and is_eol(self.data[0])) {
-            self.data = self.data[1..];
-            lines += 1;
+            .lexical_form => {
+                // Skip final column for now
+                while (self.data.len > 0 and !is_eol(self.data[0]))
+                    self.data = self.data[1..];
+                var lines: usize = 0;
+                while (self.data.len > 0 and is_eol(self.data[0])) {
+                    self.data = self.data[1..];
+                    lines += 1;
+                }
+                self.column = 0;
+                if (lines > 1) {
+                    self.mode = .verse;
+                }
+                return self.next();
+            },
         }
-        self.column = 0;
-        if (lines > 1) {
-            self.mode = .verse;
-        }
-
-        return self.next();
     }
 
     fn trim_whitespace(text: []const u8) []const u8 {
@@ -263,6 +267,12 @@ fn ccat_book_name(name: []const u8) []const u8 {
     //}
     return name;
 }
+
+const Column = enum {
+    text,
+    parsing,
+    lexical_form,
+};
 
 test "basic_ccat" {
     var p = CcatParser.init(&

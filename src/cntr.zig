@@ -18,6 +18,8 @@
 pub const folder = "resources/kjtr";
 pub const file = "KJTR.tsv";
 
+const parsing_field_length: usize = 8;
+
 pub fn reader() type {
     return struct {
         const Self = @This();
@@ -67,7 +69,7 @@ const CntrParser = struct {
     data: []const u8,
 
     /// Internal state tracking of variant markers.
-    column: u8,
+    column: Column,
 
     /// Track which verse we are reading
     current_verse: Reference = undefined,
@@ -80,7 +82,7 @@ const CntrParser = struct {
         return .{
             .data = data,
             .original = data,
-            .column = 0,
+            .column = .verse,
             .current_verse = .{
                 .module = module_tag,
                 .book = .unknown,
@@ -98,7 +100,7 @@ const CntrParser = struct {
             return t;
         }
 
-        if (self.column == 0) {
+        if (self.column == .verse) {
             // Skip lines that don't start with numbers
             if (self.data.len > 0 and !is_ascii_digit(self.data[0])) {
                 self.skip_comment_line();
@@ -111,8 +113,8 @@ const CntrParser = struct {
         //
         //   40001001   ¶Βίβλος βιβλοσ  βίβλος  9760  N  ....NFS
         var value = self.read_field();
-        if (self.column == 0) {
-            if (value.len != 8) {
+        if (self.column == .verse) {
+            if (value.len != parsing_field_length) {
                 return .{ .invalid_token = value };
             }
             if (!is_ascii_digit(value[0]) or !is_ascii_digit(value[1]) or
@@ -129,7 +131,7 @@ const CntrParser = struct {
                 .chapter = (value[2] - '0') * 100 + (value[3] - '0') * 10 + (value[4] - '0'),
                 .verse = (value[5] - '0') * 100 + (value[6] - '0') * 10 + (value[7] - '0'),
             };
-            self.column += 1;
+            self.column = .text;
             if (!ref.eql(&self.current_verse)) {
                 // If this is a new verse, send it.
                 self.current_verse = ref;
@@ -138,8 +140,8 @@ const CntrParser = struct {
             value = self.read_field();
         }
 
-        if (self.column == 1) {
-            self.column += 1;
+        if (self.column == .text) {
+            self.column = .normalised;
             if (std.mem.startsWith(u8, value, "¶")) {
                 const m = "¶".len;
                 value = value[m..];
@@ -155,17 +157,17 @@ const CntrParser = struct {
             } };
         }
 
-        if (self.column == 2) {
+        if (self.column == .normalised) {
             value = self.read_field();
-            self.column += 1;
+            self.column = .lexical_form;
         }
-        if (self.column == 3) {
+        if (self.column == .lexical_form) {
             value = self.read_field();
-            self.column += 1;
+            self.column = .strongs;
         }
 
-        if (self.column == 4) {
-            self.column += 1;
+        if (self.column == .strongs) {
+            self.column = .parsing;
             var field = value;
             var sn1: u16 = 0;
             while (field.len > 0 and is_ascii_digit(field[0])) {
@@ -175,7 +177,7 @@ const CntrParser = struct {
             return .{ .strongs = [2]u16{ sn1, 0 } };
         }
 
-        self.column = 0;
+        self.column = .verse;
 
         // Merge current and next field
         const value2 = self.read_field();
@@ -267,6 +269,15 @@ const CntrParser = struct {
         const show = @min(20, self.data.len);
         return self.data[0..show];
     }
+};
+
+const Column = enum(u8) {
+    verse = 1,
+    text = 2,
+    normalised = 3,
+    lexical_form = 4,
+    strongs = 5,
+    parsing = 6,
 };
 
 // Return a version of a string without trailing punctuation.
