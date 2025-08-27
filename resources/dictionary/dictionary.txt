@@ -23286,8 +23286,8 @@
   θηλυκόν|A-NSN|false|7626038||
   θηλυκή|A-NSF|false|5093910||
   θηλυκόν|A-ASN|false|5708288||
-θηλυκός|el||19822190|||Unknown||||||
-  θηλυκός||false|5624242||
+  θηλυκός|A-NSM|false|5620242||
+  θηλυκόν|A-ASM|false|5421938||
 θῆλυς|el|11528292|Adjective|||2338|θῆλ|en:female:woman|θῆλυς,-εια,-υ||
   θῆλυς|A-NSM|false|8018690||
   θῆλυν|A-ASM|false|5584843||
@@ -38508,7 +38508,7 @@
   πάντες|A-NPM|false|8323178||
   πάντας|A-APM|false|10266221||
   πάντων|A-GPM|false|13379492||
-  πᾶσιν|A-DPM|false|5276929|en:all:every|
+  πᾶσιν|A-DPM|true|5276929|en:all:every|
   πᾶσι|A-DPM|false|10736540||
   πάντες|A-VPM|false|4637718||
   πᾶσα|A-NSF|false|11535302||
@@ -38525,11 +38525,10 @@
   πᾶν|A-ASN|false|2870548||
   παντός|A-GSN|false|12880441||
   παντί|A-DSN|false|5164362|en:to all:to every|
-  πάνθ᾽|A-DSN|false|13035256||
   πάντα|A-NPN|false|9110057||
   πάντα|A-APN|false|10440656||
   πάντων|A-GPN|false|426255||
-  πᾶσιν|A-DPN|false|8142486|en:to all:to every|
+  πᾶσιν|A-DPN|true|8142486|en:to all:to every|
   πᾶσι|A-DPN|false|10520653||
   πᾶς|T-NSM|false|7639032||
   πάντες|T-NPM|false|6372775||
