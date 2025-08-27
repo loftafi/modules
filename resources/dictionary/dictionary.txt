@@ -38497,93 +38497,34 @@
   παρρησιάζομαι|V-PMI-1S|false|3765017||
   παρρησιάζομαι|V-PPI-1S|false|10449222||
 πᾶς|el|11997419|Adjective|||3956|πᾶς|en:all:every:all things:whole:every kind of#zh:每一個#ru:всякий:каждый:целый:все#es:todos:todo:todas:cada|||
-  πάσας|N-APF|false|4263302|en:all#es:todas:a todas|
-  πᾶν|N-ASN|false|9735402||
   πᾶς|A-NSM|false|1561242||
-  πάντα|A-ASM|false|3581984||
-  πᾶν|A-ASM|false|291469||
   παντός|A-GSM|false|10810930||
   παντί|A-DSM|false|9931608||
+  πάντα|A-ASM|false|3581984||
   πᾶς|A-VSM|false|10900805||
   πάντες|A-NPM|false|8323178||
-  πάντας|A-APM|false|10266221||
   πάντων|A-GPM|false|13379492||
   πᾶσιν|A-DPM|true|5276929|en:all:every|
   πᾶσι|A-DPM|false|10736540||
+  πάντας|A-APM|false|10266221||
   πάντες|A-VPM|false|4637718||
   πᾶσα|A-NSF|false|11535302||
-  πᾶσαν|A-ASF|false|6042797||
   πάσης|A-GSF|false|16404242||
   πάσῃ|A-DSF|false|15767539||
+  πᾶσαν|A-ASF|false|6042797||
   πᾶσαι|A-NPF|false|10037524||
-  πάσας|A-APF|false|9997856||
   πασῶν|A-GPF|false|14528931|en:of all:of every|
-  πάντων|A-GPF|false|465333||
   πάσαις|A-DPF|false|1665121||
-  πᾶσαις|A-DPF|false|5554873||
+  πάσας|N-APF|false|4263302|en:all#es:todas:a todas|
   πᾶν|A-NSN|false|877067||
-  πᾶν|A-ASN|false|2870548||
   παντός|A-GSN|false|12880441||
   παντί|A-DSN|false|5164362|en:to all:to every|
+  πᾶν|A-ASN|false|2870548||
   πάντα|A-NPN|false|9110057||
-  πάντα|A-APN|false|10440656||
   πάντων|A-GPN|false|426255||
   πᾶσιν|A-DPN|true|8142486|en:to all:to every|
   πᾶσι|A-DPN|false|10520653||
-  πᾶς|T-NSM|false|7639032||
-  πάντες|T-NPM|false|6372775||
-  πάντα|T-ASM|false|8406169||
-  πάντας|T-APM|false|7886229||
-  παντός|T-GSM|false|15957768||
-  πάντων|T-GPM|false|14499745||
-  παντί|T-DSM|false|7376681||
-  πᾶσιν|T-DPM|false|2488825||
-  πᾶσι|T-DPM|false|4050544||
-  πάσιν|T-DPM|false|1730043||
-  πᾶς|T-VSM|false|9438528||
-  πάντες|T-VPM|false|4198179||
-  πᾶσα|T-NSF|false|11490335||
-  πᾶσαι|T-NPF|false|8969803||
-  πᾶσαν|T-ASF|false|12031747||
-  πάσαν|T-ASF|false|16509516||
-  πάσας|T-APF|false|13772328||
-  πάσης|T-GSF|false|4590572||
-  πασῶν|T-GPF|false|5400760||
-  πάσῃ|T-DSF|false|5345128||
-  πάσαις|T-DPF|false|10663389||
-  πᾶν|T-NSN|false|3614857||
-  πάντα|T-NPN|false|1751452||
-  πᾶν|T-ASN|false|5653935||
-  πάντα|T-APN|false|1653502||
-  παντός|T-GSN|false|4316668||
-  πάντων|T-GPN|false|16649271||
-  παντί|T-DSN|false|9049899||
-  πᾶσιν|T-DPN|false|15749445||
-  πᾶσι|T-DPN|false|2751275||
-  πάντα|T-VPN|false|7786607||
-  πᾶς|O-NSM|false|5947596||
-  πάντες|O-NPM|false|9877419||
-  πάντα|O-ASM|false|2211279||
-  πάντας|O-APM|false|13206497||
-  παντός|O-GSM|false|7608551||
-  πάντων|O-GPM|false|5441332||
-  παντί|O-DSM|false|11768848||
-  πᾶσιν|O-DPM|false|7870805||
-  πᾶσι|O-DPM|false|8222260||
-  πάσιν|O-DPM|false|6942929||
-  πάντες|O-VPM|false|2038282||
-  πᾶσα|O-NSF|false|11587898||
-  πᾶσαι|O-NPF|false|14438587||
-  πασῶν|O-GPF|false|5323793||
-  πᾶν|O-NSN|false|726322||
-  πάντα|O-NPN|false|7263162||
-  πᾶν|O-ASN|false|13689347||
-  πάντα|O-APN|false|9115661||
-  παντός|O-GSN|false|4716742||
-  πάντων|O-GPN|false|15521469||
-  παντί|O-DSN|false|13508731||
-  πᾶσιν|O-DPN|false|13303858||
-  πάσιν|O-DPN|false|15046089||
+  πάντα|A-APN|false|10440656||
 πάσχα|el|6747587|Noun|τό||3957|πάσχα|en:passover:passover feast:passover lamb#ru:Пасха:пасхальная трапеза:пасхальный ягненок|||
   πάσχα|N-NSN|false|16136540||
   πάσχα|N-ASN|false|9472040||
