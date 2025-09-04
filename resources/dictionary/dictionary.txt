@@ -45472,13 +45472,21 @@
   σκανδάλων|N-GPN|false|125426||
 σκάπτω|el|10188842|Verb|||4626|σκάπτ|en:dig|||
   σκάπτω|V-PAI-1S|false|125460||
+  σκάπτεις|V-PAI-2S|false|14942321||
   σκάπτει|V-PAI-3S|false|125461||
+  σκάπτομεν|V-PAI-1P|false|13953570||
+  σκάπτετε|V-PAI-2P|false|8600750||
+  σκάπτουσιν|V-PAI-3P|false|4692499||
   ἔσκαψεν|V-AAI-3S|true|125462||
   ἔσκαψε|V-AAI-3S|false|125463||
   σκαφῇ|V-FPI-3S|false|125464||
   σκάψω|V-AAS-1S|false|125465||
   σκαφῇ|V-APS-3S|false|125466||
   σκάπτειν|V-PAN|false|125467||
+  σκάπτε|V-PAM-2S|false|11763889||
+  σκαπτέτω|V-PAM-2S|false|2868636||
+  σκάπτετε|V-PAM-2P|false|9839814||
+  σκαπτόντων|V-PAM-3P|false|10791129||
 σκάφη|el|11482394|Noun|ἡ|-ης|4627|σκάφ|en:dish:small boat:boat|||
   σκάφη|N-NSF|false|125499||
   σκάφην|N-ASF|false|125500||
