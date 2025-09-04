@@ -7053,7 +7053,7 @@
 ἄρτιος|el|16048910|Adjective|||739|ἄρτι|en:complete:adequate:perfect|ἄρτιος,-α,-ον||
   ἄρτιος|A-NSM|false|15047649||
 ἄρτος|el|7860757|Noun|ὁ|-ου|740|ἄρτ|en:bread:loaf of bread:food#zh:麵包:飯#ru:хлеб#es:pan||food, object|
-  ἄρτος|N-NSM|false|10283437|en:bread:loaf of bread:food#es:pan|
+  ἄρτος|N-NSM|false|10283438|en:bread:loaf of bread:food#es:pan|
   ἄρτον|N-ASM|false|11125778|en:bread#es:pan|
   ἄρτου|N-GSM|false|1283136|en:of bread|
   ἄρτῳ|N-DSM|false|12471357|en:to bread|
@@ -14713,25 +14713,23 @@
 ἐγώ|el|12185583|PersonalPronoun|||1473|ἐγώ|en:I#zh:我#ru:я#es:Yo|||
   ἐγώ|P-1NS|true|12728721|en:I|
   με|P-1AS|true|1263635|en:me|
-  ἐμέ|P-1AS|false|13596032|en:me|
   μέ|P-1AS|false|777129|en:me|
+  ἐμέ|P-1AS|false|13596032|en:me|
   μου|P-1GS|true|7762336|en:of me:my|
   ἐμοῦ|P-1GS|false|4890925|en:of me:my|
-  μοῦ|P-1GS|false|153697||
   μού|P-1GS|false|5399714||
   μοι|P-1DS|true|5450727|en:to me:for me|
-  ἐμοί|P-1DS|false|15781085|en:to me:for me|
   μοί|P-1DS|false|15179267|en:to me:for me|
+  ἐμοί|P-1DS|false|15781085|en:to me:for me|
   ἡμεῖς|P-1NP|true|9731474|en:we|
-  ἡμείς|P-1NP|false|129190|en:we|
   ἡμᾶς|P-1AP|false|6492060|en:us|
   ἡμῶν|P-1GP|false|11935252|en:of us:our|
   ἡμῖν|P-1DP|false|4441926|en:to us|
   ἐγώ|O-NS|false|6807060|en:I|
   ἡμεῖς|O-NP|false|5683806|en:we|
   με|O-AS|false|10884412|en:me|
-  ἐμέ|O-AS|false|7136007|en:me|
   μέ|O-AS|false|10168836|en:me|
+  ἐμέ|O-AS|false|7136007|en:me|
   ἡμᾶς|O-AP|false|15502044|en:us|
   μου|O-GS|true|11671242|en:of me|
   μοῦ|O-GS|false|153698||
@@ -46338,15 +46336,26 @@
   στενάζεις|V-PAI-2S|false|127926||
   στενάζει|V-PAI-3S|false|127927||
   στενάζομεν|V-PAI-1P|false|127928||
+  στενάζετε|V-PAI-2P|false|13206068||
+  στενάζουσιν|V-PAI-3P|false|8754311||
+  στενάζουσι|V-PAI-3P|false|13431250||
   στενάξω|V-FAI-1S|false|127929||
   στενάξεις|V-FAI-2S|false|127930||
   στενάξει|V-FAI-3S|false|127931||
+  στενάξομεν|V-FAI-1P|false|14407828||
+  στενάξετε|V-FAI-2P|false|14436477||
   στενάξουσιν|V-FAI-3P|false|127932||
   ἐστέναξα|V-AAI-1S|false|127933||
   ἐστέναξεν|V-AAI-3S|true|127934||
   ἐστέναξε|V-AAI-3S|false|127935||
   ἐστέναξαν|V-AAI-3P|false|127936||
   στενάξονται|V-FMI-3P|false|127937||
+  στενάζω|V-PAS-1S|false|14482884||
+  στενάζῃς|V-PAS-2S|false|4475935||
+  στενάζῃ|V-PAS-3S|false|3643303||
+  στενάζωμεν|V-PAS-1P|false|12307173||
+  στενάζετε|V-PAS-2P|false|6758103||
+  στενάζουσιν|V-PAS-3P|false|1408239||
   στενάξῃς|V-AAS-2S|false|127938||
   στενάζετε|V-PAM-2P|false|127939||
   στενάξαι|V-AAN|false|127940||
