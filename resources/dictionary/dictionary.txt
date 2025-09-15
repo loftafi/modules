@@ -1,5 +1,8 @@
 α|el|6128465|Letter|||||en:alpha||alphabet|
   α||false|4463684||
+ἅ|el|10651012|Particle|||||en:ha!;ha ha!|||
+  ἅ|PRT|false|12630232|en:ha!:ha ha!|
+  ἇ|PRT|false|12630233|en:ha!:ha ha!|
 ἀάατος|el|335547|Unknown|||||en:invincible:infallible:decisive|||
   ἀάατος||false|582729||
 ἀαγής|el|3061599|Unknown|||||en:hard, unbreakable, solid|||
@@ -46367,6 +46370,7 @@
   στενάξῃς|V-AAS-2S|false|127938||
   στενάζετε|V-PAM-2P|false|127939||
   στενάξαι|V-AAN|false|127940||
+  στενάζειν|V-PAN|false|227928||
   στενάζοντες|V-PAP-NPM|false|127941||
 στενός|el|14747191|Adjective|||4728|στεν|en:narrow|στενός,-ή,-όν||
   στενός|A-NSM|false|127974||
