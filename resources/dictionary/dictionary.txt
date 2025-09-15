@@ -17019,7 +17019,7 @@
   ἐνέπρησε|V-AAI-3S|false|7698370||
 ἔμπροσθεν|el|15337828|Preposition|||1715|ἔμπροσθεν|en:in front of {+gen}:before {+gen}:before the face#zh:前:面前#ru:перед:впереди:прежде {+род}#es:delante:antes|||
   ἔμπροσθεν|ADV|false|921043||
-  ἔμπροσθεν|PREP|false|597125||
+  ἔμπροσθεν|PREP|true|597125||
   ἔμπροσθε|PREP|false|14445241||
 ἐμπτύω|el|13802629|Verb|||1716|ἐμπτύ|en:spit upon|||
   ἐμπτύω|V-PAI-1S|false|13013459||
@@ -24747,7 +24747,7 @@
   Ἰωάννα|N-NSF|false|9943575||
   Ἰωάνα|N-NSF|false|5746399||
 Ἰωάννης|el|16121199|ProperNoun|ὁ|-ου|2491|Ἰωάνν|en:John#zh:約翰#ru:Иоанн#es:Juan||person|
-  Ἰωάννης|N-NSM|false|15002050|en:John|
+  Ἰωάννης|N-NSM|true|15002050|en:John|
   Ἰωάνης|N-NSM|false|3163579|en:John|
   Ἰωάννην|N-ASM|false|5813711|en:John|
   Ἰωάνην|N-ASM|false|9665374|en:John|
@@ -25943,10 +25943,10 @@
   κάρφος|N-NSN|false|9514696||
   κάρφος|N-ASN|false|12095198||
 κατά|el|15400280|Preposition|||2596|κατά|en:according to {+acc}:against {+gen}:down from {+gen}#zh:往下:對抗:按照:朝著:依據#ru:вниз:против {+род}; по:среди:согласно {+вин}#es:según:conforme:contra|||
-  καθ᾽|ADV|false|7663786||
-  κατά|PREP|true|6672476||
+  κατά|PREP|true|6672476|en:down:down from:according to:against#zh:往下:對抗:按照:朝著:依據#ru:вниз:против; по:среди:согласно#es:según:conforme:contra|
   κατ᾽|PREP|false|8685055||
   καθ᾽|PREP|false|4567364||
+  καθ᾽|ADV|false|7663786||
 καταβαίνω|el|14374645|Verb|||2597|καταβαίν|en:go down:come down#ru:спускаться#es:bajar:descender|||
   καταβαίνω|V-PAI-1S|false|4000047||
   καταβαίνεις|V-PAI-2S|false|11995919||
