@@ -8275,15 +8275,9 @@
   Βάαλ|N-PRI|false|2184903||
   Βάαλ|N-VSM|false|8593428||
 Βαβυλών|el|3128999|ProperNoun|ἡ|-ῶνος|897|Βαβυλώ|en:Babylon#zh:巴比倫#ru:Вавилон#es:Babilonia||place, city|
-  Βαβυλῶνα|N-ASM|false|510230||
-  Βαβυλῶνος|N-GSM|false|16015959||
-  Βαβυλῶνι|N-DSM|false|5807641||
-  Βαβυλών|N-NSF|false|16606772||
-  Βαβυλων|N-NSF|false|10225833||
-  Βαβυλών|N-NSF|false|15655371||
+  Βαβυλών|N-NSF|true|15006772||
   Βαβυλῶνα|N-ASF|false|15392986||
   Βαβυλῶνος|N-GSF|false|725405||
-  Βαβυλῶνι|N-GSF|false|4415598||
   Βαβυλῶνι|N-DSF|false|6839904||
   Βαβυλών|N-VSF|false|6323497||
 βαδίζω|el|7160497|Verb||||βαδίζ|en:walks:goes#es:voy:camino|||
@@ -19586,26 +19580,33 @@
   ἐπουρανίοις|A-DPN|false|5161534||
   ἐπουρανίοις|A-DPM|false|157908||
   ἐπουρανίου|A-GSN|false|157909||
-ἑπτά|el|7198994|Particle|||2033|ἑπτά|en:seven:7#zh:七:7#ru:семь:7#es:siete||number|
-  ἑπτά|A-NPM|false|3314081||
-  ἑπτά|A-APM|false|2611742||
-  ἑπτά|A-GPM|false|2035258||
-  ἑπτά|A-APF|false|8648360||
-  ἑπτά|A-APN|false|1190464||
-  ἑπτά|A-GPN|false|9814791||
-  ἑπτά|T-NPM|false|12738979||
-  ἑπτά|T-APM|false|1363703||
-  ἑπτά|T-GPM|false|8625385||
-  ἑπτά|T-DPM|false|3756937||
-  ἑπτά|T-NPF|false|10937016||
-  ἑπτά|T-APF|false|3911959||
-  ἑπτά|T-GPF|false|1166976||
-  ἑπτά|T-DPF|false|11659223||
-  ἑπτά|T-NPN|false|8332642||
-  ἑπτά|T-APN|false|6819438||
-  ἑπτά|T-GPN|false|232029||
-  ἑπτά|A-NUI|false|8851476||
-  ἑπτά|A-NPN|false|157775||
+ἑπτά|el|7198994|Adjective|||2033|ἑπτά|en:seven:7#zh:七:7#ru:семь:7#es:siete||number|
+  ἑπτά|A-NPM|true|3314081||
+  ἑπτά|A-APM|false|9611742||
+  ἑπτά|A-GPM|false|9035258||
+  ἑπτά|A-DPM|false|8035258||
+  ἑπτά|T-NPM|false|8738979||
+  ἑπτά|T-APM|false|7363703||
+  ἑπτά|T-GPM|false|7625385||
+  ἑπτά|T-DPM|false|6756937||
+  ἑπτά|A-NPF|false|6937016||
+  ἑπτά|A-APF|false|5648360||
+  ἑπτά|A-GPF|false|5166976||
+  ἑπτά|A-DPF|false|1659223||
+  ἑπτά|T-NPF|false|1037016||
+  ἑπτά|T-APF|false|2911959||
+  ἑπτά|T-GPF|false|2166976||
+  ἑπτά|T-DPF|false|3658223||
+  ἑπτά|A-NPN|false|357175||
+  ἑπτά|A-APN|false|4195464||
+  ἑπτά|A-GPN|false|4812791||
+  ἑπτά|A-DPN|false|4810712||
+  ἑπτά|T-NPN|false|8332602||
+  ἑπτά|T-APN|false|3819414||
+  ἑπτά|T-GPN|false|332023||
+  ἑπτά|T-DPN|false|332024||
+  ἑπτά|A-NUI|false|3851476||
+  ἑπτά|A-NUI|false|3851476||
 ἑπτάκις|el|5741311|Adverb|||2034|ἑπτάκις|en:seven times|||
   ἑπτάκις|ADV|false|10520458||
   ἑπτάκι|ADV|false|8712307||
@@ -23281,10 +23282,12 @@
   θηλαζόντων|V-PAP-GPM|false|11248125||
   θηλαζούσαις|V-PAP-DPF|false|214377||
   θηλαζόντων|V-PAP-GPN|false|154498||
-θηλυκόν|el|13060038|Adjective||||θηλυκ|en:feminine#es:femenino||grammar|
-  θηλυκόν|A-NSN|false|15106452||
-  θηλυκή|A-NSF|false|15494670||
+θηλυκός|el|13060038|Adjective||||θηλυκ|en:feminine; female-like#es:femenino||grammar|
+  θηλυκός|A-NSM|true|15106452||
+  θηλυκόν|A-ASM|true|15106453||
+  θηλυκόν|A-NSN|true|15106454||
   θηλυκόν|A-ASN|false|157601||
+  θηλυκή|A-NSF|false|15494670||
 θῆλυς|el|9343719|Adjective|||2338|θῆλ|en:female:woman|θῆλυς,-εια,-υ||
   θῆλυς|A-NSM|false|4238377||
   θῆλυν|A-ASM|false|12403269||
@@ -32364,13 +32367,6 @@
   μειράκιον|A-ASN|false|156611||
   μειράκια|A-NPN|false|156612||
   μειράκια|A-APN|false|156613||
-μέλαν|el|10276349|Adjective|||3188|μέλαν|en:ink|||
-  μέλαν|A-NSN|false|14163610||
-  μέλανος|A-GSN|false|1730836||
-  μελανος|A-GSN|false|2703880||
-  μέλανι|A-DSN|false|14906584||
-  μελανι|A-DSN|false|2024784||
-  μέλαν|A-ASN|false|157619||
 μέλας|el|15684547|Adjective|||3189|μέλ|en:black:ink#zh:黑色#es:negro|μέλας,-αινα,-αν|colour|
   μέλας|A-NSM|false|1595270|en:black:ink|
   μέλαν|A-ASM|true|4180610|en:black:ink|
@@ -40801,9 +40797,9 @@
   πλήν|CONJ|false|111595||
   πλήν|PREP|false|111596||
 πλήρης|el|9923696|Adjective|||4134|πλήρης|en:full#zh:完全的:充滿的#ru:полный|||
-  πλήρει|N-DSF|false|111603||
-  πλήρης|A-NSM|false|111604||
+  πλήρης|A-NSM|true|111604||
   πλήρη|A-ASM|false|111605||
+  πλήρει|N-DSF|false|111603||
   πλήρους|A-GSM|false|111606||
   πλήρης|A-VSM|false|111607||
   πλήρεις|A-NPM|false|111608||
@@ -41493,8 +41489,6 @@
   πολίτας|N-APN|false|112841||
   πολιτῶν|N-GPN|false|112842||
   πολίταις|N-DPN|false|112843||
-  πολλά|ADV|false|112844||
-  πολύ|ADV|false|112845||
 πολλάκις|el|6209514|Adverb|||4178|πολλάκις|en:often:many times#ru:много раз:многократно:часто#es:muchas:a menudo:muchas veces||time|
   πολλάκις|ADV|false|112868||
 πολλαπλασίων|el|15740602|Adjective|||4179|πολλαπλασίων|en:many times as much:many times more:manifold|||
@@ -43656,17 +43650,15 @@
   πρώτον|ADV|false|120756||
   πρῶτον|ADV-S|false|120757||
 πρῶτος|el|14028265|Adjective|||4413|πρῶτ|en:first:before#zh:第一的#ru:первый|πρῶτος,-η,-ον|ordinal-number, sequence|
+  πρῶτος|A-NSM|true|120784||
   πρῶτον|A-ASM|false|120783||
-  πρῶτος|A-NSM|false|120784||
-  πρώτου|A-GSM|false|120785||
-  προτέρου|A-GSM|false|120786||
+  πρώτου|A-GSM|true|120785||
   πρώτῳ|A-DSM|false|120787||
   πρῶτοι|A-NPM|false|120788||
   πρώτους|A-APM|false|120789||
   πρώτων|A-GPM|false|120790||
   πρώτοις|A-DPM|false|120791||
-  πρώτη|A-NSF|false|120792||
-  προτέρα|A-NSF|false|120793||
+  πρώτη|A-NSF|true|120792||
   πρώτην|A-ASF|false|120794||
   πρώτης|A-GSF|false|120795||
   πρώτῃ|A-DSF|false|120796||
@@ -43713,6 +43705,8 @@
   πρῶτον|A-NSN|false|157655||
   πρῶτα|A-APN|false|157829||
   πρώτου|A-GSN|false|157939||
+  προτέρα|A-NSF|false|120793||
+  προτέρου|A-GSM|false|120786||
 πρωτοστάτης|el|12683954|Noun|ὁ|-ου|4414|πρωτοστάτ|en:leader:ringleader:chief|||
   πρωτοστάτης|N-NSM|false|120843||
   πρωτοστάτην|N-ASM|false|120844||
