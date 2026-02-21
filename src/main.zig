@@ -1,8 +1,8 @@
-pub fn main() !void {
-    const allocator = std.heap.smp_allocator;
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.gpa;
 
     // Load the dictionary of words before loading text modules
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(gpa);
     errdefer arena.deinit();
     var dictionary = try Dictionary.create(arena.allocator());
     errdefer dictionary.destroy(arena.allocator());
@@ -10,16 +10,16 @@ pub fn main() !void {
     try dictionary.saveBinaryFile("generated/dictionary.bin", false);
 
     var module = Module.init();
-    var byzantine_reader = try byzantine.reader().init(allocator, true);
-    try module.read(allocator, &byzantine_reader);
-    try module.saveText(allocator);
-    try module.saveBinary(allocator);
+    var byzantine_reader = try byzantine.reader().init(gpa, init.io, true);
+    try module.read(gpa, &byzantine_reader);
+    try module.saveText(gpa);
+    try module.saveBinary(gpa);
 
     module = Module.init();
-    var nestle_reader = try nestle.reader().init(allocator, true);
-    try module.read(allocator, &nestle_reader);
-    try module.saveText(allocator);
-    try module.saveBinary(allocator);
+    var nestle_reader = try nestle.reader().init(gpa, init.io, true);
+    try module.read(gpa, &nestle_reader);
+    try module.saveText(gpa);
+    try module.saveBinary(gpa);
 }
 
 const std = @import("std");

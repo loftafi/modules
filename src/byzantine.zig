@@ -19,18 +19,18 @@ pub fn reader() type {
         carryover_token: Token = .unknown,
         verbose: bool = false,
 
-        pub fn init(allocator: Allocator, verbose: bool) !Self {
+        pub fn init(allocator: Allocator, io: std.Io, verbose: bool) !Self {
             var buf: [50]u8 = undefined;
-            const dir = try std.fs.cwd().openDir(folder, .{});
+            const dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
 
             const book = extract_book_from_filename(files[0]);
 
             var filename = try bufPrint(&buf, "{s}.BP5", .{files[0]});
-            const data = try load_file_bytes(allocator, dir, filename);
+            const data = try load_file_bytes(allocator, io, dir, filename);
             const parser = ByzParser.init(data, book);
 
             filename = try bufPrint(&buf, "{s}.TXT", .{files[0]});
-            const data2 = try load_file_bytes(allocator, dir, filename);
+            const data2 = try load_file_bytes(allocator, io, dir, filename);
             const parser2 = ByzParser.init(data2, book);
 
             if (verbose)
@@ -55,7 +55,7 @@ pub fn reader() type {
 
         // Read parser2 tokens for paragraph and accentation,
         // supplimented by parser1 tokens for parsing data.
-        pub fn next(self: *Self, allocator: Allocator) !Token {
+        pub fn next(self: *Self, allocator: Allocator, io: std.Io) !Token {
             var token: Token = .{ .unknown = {} };
 
             if (self.carryover_token == .unknown) {
@@ -74,21 +74,21 @@ pub fn reader() type {
                 if (self.files_index >= files.len) return token;
 
                 var buf: [50]u8 = undefined;
-                const dir = try std.fs.cwd().openDir(folder, .{});
+                const dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
 
                 const book = extract_book_from_filename(files[self.files_index]);
                 var filename = try bufPrint(&buf, "{s}.BP5", .{
                     files[self.files_index],
                 });
                 allocator.free(self.data);
-                self.data = try load_file_bytes(allocator, dir, filename);
+                self.data = try load_file_bytes(allocator, io, dir, filename);
                 self.parser = ByzParser.init(self.data, book);
 
                 filename = try bufPrint(&buf, "{s}.TXT", .{
                     files[self.files_index],
                 });
                 allocator.free(self.data2);
-                self.data2 = try load_file_bytes(allocator, dir, filename);
+                self.data2 = try load_file_bytes(allocator, io, dir, filename);
                 self.parser2 = ByzParser.init(self.data2, book);
 
                 debug("reading book {s}", .{@tagName(book)});
@@ -185,7 +185,7 @@ const ByzParser = struct {
     original: []const u8 = "",
 
     /// Cache a greek betacode decoding
-    greek_buffer: BoundedArray(u8, praxis.MAX_WORD_SIZE),
+    greek_buffer: praxis.BoundedArray(u8, praxis.max_word_size),
 
     /// Internal state tracking of variant markers.
     variant: u8 = 0,
@@ -640,14 +640,15 @@ test "basic" {
 
 test "test_parse_byzantine_files" {
     const allocator = std.testing.allocator;
+    const io = std.testing.io;
     var token_count: usize = 0;
 
-    var p = try reader().init(allocator, true);
+    var p = try reader().init(allocator, io, true);
     defer p.deinit(allocator);
 
     var ref: Reference = .unknown;
     while (true) {
-        const token = p.next(allocator) catch |e| {
+        const token = p.next(allocator, io) catch |e| {
             std.log.err("Failed parsing {any}. Error {any}", .{
                 @tagName(p.module()),
                 e,
@@ -694,7 +695,7 @@ const praxis = @import("praxis");
 const Parsing = praxis.Parsing;
 const Reference = praxis.Reference;
 const BetacodeType = praxis.BetacodeType;
-const parse_tag = praxis.parse;
+const parse_tag = praxis.byz.parse;
 const betacode_to_greek = praxis.betacode_to_greek;
 
 const modules = @import("modules.zig");

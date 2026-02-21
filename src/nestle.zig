@@ -8,9 +8,9 @@ pub fn reader() type {
         parser: NestleParser,
         verbose: bool = false,
 
-        pub fn init(allocator: Allocator, verbose: bool) !Self {
-            const dir = try std.fs.cwd().openDir(folder, .{});
-            const data = try load_file_bytes(allocator, dir, filename);
+        pub fn init(allocator: Allocator, io: std.Io, verbose: bool) !Self {
+            const dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
+            const data = try load_file_bytes(allocator, io, dir, filename);
             return .{
                 .data = data,
                 .parser = NestleParser.init(modules.remove_bom(data)),
@@ -366,9 +366,10 @@ test "basic" {
 
 test "test_parse_nestle_files" {
     const allocator = std.testing.allocator;
+    const io = std.testing.io;
     var token_count: usize = 0;
 
-    var p = try reader().init(allocator, true);
+    var p = try reader().init(allocator, io, true);
     defer p.deinit(allocator);
 
     while (true) {
@@ -397,7 +398,7 @@ const Allocator = std.mem.Allocator;
 
 const praxis = @import("praxis");
 const Reference = praxis.Reference;
-const parse_tag = praxis.parse;
+const parse_tag = praxis.byz.parse;
 
 const modules = @import("modules.zig");
 const Token = modules.Token;

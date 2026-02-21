@@ -125,12 +125,12 @@ pub const Module = struct {
         });
     }
 
-    pub fn saveText(self: *Module, allocator: Allocator) !void {
+    pub fn saveText(self: *Module, allocator: Allocator, io: std.Io) !void {
         const filename = try std.fmt.allocPrint(allocator, "generated/{s}.txt", .{self.module});
         debug("generating {s}", .{filename});
         defer allocator.free(filename);
-        const file = try std.fs.cwd().createFile(filename, .{ .truncate = true });
-        defer file.close();
+        const file = try std.Io.Dir.cwd().createFile(io, filename, .{ .truncate = true });
+        defer file.close(io);
         var reference: Reference = .unknown;
         for (self.paragraphs.items) |paragraph| {
             if (paragraph.verses.items.len > 0) {
@@ -152,11 +152,11 @@ pub const Module = struct {
         return;
     }
 
-    pub fn saveBinary(self: *Module, allocator: Allocator) !void {
+    pub fn saveBinary(self: *Module, allocator: Allocator, io: std.Io) !void {
         const filename = try std.fmt.allocPrint(allocator, "generated/{s}.bin", .{self.module});
         defer allocator.free(filename);
-        const file = try std.fs.cwd().createFile(filename, .{ .truncate = true });
-        defer file.close();
+        const file = try std.Io.Dir.cwd().createFile(io, filename, .{ .truncate = true });
+        defer file.close(io);
         for (self.paragraphs.items) |paragraph| {
             //try file.writeAll(paragraph.words.items);
             try file.writeAll(paragraph.text);
@@ -248,19 +248,11 @@ pub const Token = union(TokenType) {
 
 pub fn load_file_bytes(
     allocator: Allocator,
-    dir: std.fs.Dir,
+    io: std.Io,
+    dir: std.Io.Dir,
     filename: []const u8,
 ) ![]u8 {
-    const file = dir.openFile(
-        filename,
-        .{ .mode = .read_only },
-    ) catch |e| {
-        std.log.err("Resource file missing: {s}", .{filename});
-        return e;
-    };
-    defer file.close();
-    const stat = try file.stat();
-    return try file.readToEndAlloc(allocator, stat.size);
+    return try dir.readFileAlloc(io, filename, allocator, .unlimited);
 }
 
 pub fn remove_bom(data: []u8) []u8 {
