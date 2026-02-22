@@ -14,20 +14,28 @@ pub const Module = struct {
         };
     }
 
-    pub fn read(self: *Module, allocator: Allocator, reader: anytype) !void {
+    /// Fill the contents of this module using a custom `reader` that
+    /// understands the data format of that content source.
+    pub fn read(
+        self: *Module,
+        allocator: Allocator,
+        io: std.Io,
+        reader: anytype,
+    ) !void {
         var paragraphs: std.ArrayListUnmanaged(Paragraph) = .empty;
         var all_verses: std.ArrayListUnmanaged(Verse) = .empty;
         var paragraph_verses: std.ArrayListUnmanaged(Verse) = .empty;
-        var text: std.ArrayListUnmanaged(u8) = .empty;
-        var token_count: usize = 0;
-        var annotation_skip = false;
+        var text: std.Io.Writer.Allocating = .init(allocator);
+        defer text.deinit();
 
         self.module = @tagName(reader.module());
         debug("reading {s} module data", .{self.module});
 
+        var token_count: usize = 0;
+        var annotation_skip = false;
         while (true) {
             if (token_count > max_token_guard) break;
-            const t = verse_paragrah_flipper(allocator, reader) catch |e| {
+            const t = verse_paragrah_flipper(allocator, io, reader) catch |e| {
                 std.log.err("Failed reading {s} module. '{s}' {any}", .{
                     @tagName(reader.module()),
                     reader.debug_slice(),
@@ -41,25 +49,25 @@ pub const Module = struct {
 
             switch (t) {
                 .paragraph => {
-                    if (text.items.len == 0) continue;
+                    if (text.written().len == 0) continue;
                     try paragraphs.append(allocator, .{
-                        .text = try allocator.dupe(u8, text.items),
+                        .text = try allocator.dupe(u8, text.written()),
                         .verses = paragraph_verses,
                         .words = .empty,
                     });
-                    text = .empty;
+                    text.clearRetainingCapacity();
                     paragraph_verses = .empty;
                 },
                 .verse => {
-                    if (text.items.len > 0) try text.append(allocator, ' ');
+                    if (text.written().len > 0) try text.writer.writeByte(' ');
                     const ref = t.verse;
                     if (ref.verse == 1) {
-                        try text.writer(allocator).print("{d}:{d}", .{
+                        try text.writer.print("{d}:{d}", .{
                             ref.chapter,
                             ref.verse,
                         });
                     } else {
-                        try text.writer(allocator).print("{d}", .{
+                        try text.writer.print("{d}", .{
                             ref.verse,
                         });
                     }
@@ -67,17 +75,17 @@ pub const Module = struct {
                     try paragraph_verses.append(allocator, .{
                         .reference = t.verse,
                         .paragraph = paragraphs.items.len,
-                        .index = text.items.len,
+                        .index = text.written().len,
                     });
                     try all_verses.append(allocator, .{
                         .reference = t.verse,
                         .paragraph = paragraphs.items.len,
-                        .index = text.items.len,
+                        .index = text.written().len,
                     });
                 },
                 .word => {
-                    if (text.items.len > 0) try text.append(allocator, ' ');
-                    try text.appendSlice(allocator, t.word.text);
+                    if (text.written().len > 0) try text.writer.writeByte(' ');
+                    try text.writer.writeAll(t.word.text);
                 },
                 .strongs => {
                     //
@@ -92,9 +100,9 @@ pub const Module = struct {
                     annotation_skip = true;
                 },
                 .eof => {
-                    if (text.items.len > 0) {
+                    if (text.written().len > 0) {
                         try paragraphs.append(allocator, .{
-                            .text = try allocator.dupe(u8, text.items),
+                            .text = try allocator.dupe(u8, text.written()),
                             .verses = paragraph_verses,
                             .words = .empty,
                         });
@@ -125,12 +133,22 @@ pub const Module = struct {
         });
     }
 
-    pub fn saveText(self: *Module, allocator: Allocator, io: std.Io) !void {
+    /// Output a module in a plain human readable text format.
+    pub fn saveText(
+        self: *Module,
+        allocator: Allocator,
+        io: std.Io,
+    ) (Allocator.Error || std.Io.File.OpenError || std.Io.Writer.Error)!void {
         const filename = try std.fmt.allocPrint(allocator, "generated/{s}.txt", .{self.module});
-        debug("generating {s}", .{filename});
         defer allocator.free(filename);
+        info("outputting text module {s} to {s}", .{ self.module, filename });
+
         const file = try std.Io.Dir.cwd().createFile(io, filename, .{ .truncate = true });
         defer file.close(io);
+        var buffer: [1024 * 5]u8 = undefined;
+        var out = file.writer(io, &buffer);
+        var writer = &out.interface;
+
         var reference: Reference = .unknown;
         for (self.paragraphs.items) |paragraph| {
             if (paragraph.verses.items.len > 0) {
@@ -141,42 +159,52 @@ pub const Module = struct {
                         paragraph.verses.items[0].reference.module,
                     });
                     reference = paragraph.verses.items[0].reference;
-                    const info = reference.book.info();
-                    try file.writer().print("# {s}", .{info.english});
-                    try file.writeAll("\n\n");
+                    const book_info = reference.book.info();
+                    try writer.print("# {s}", .{book_info.english});
+                    try writer.writeAll("\n\n");
                 }
             }
-            try file.writeAll(paragraph.text);
-            try file.writeAll("\n\n");
+            try writer.writeAll(paragraph.text);
+            try writer.writeAll("\n\n");
         }
-        return;
+        try writer.flush();
+        debug("generated {s}", .{filename});
     }
 
+    /// Output the module in a binary format.
     pub fn saveBinary(self: *Module, allocator: Allocator, io: std.Io) !void {
         const filename = try std.fmt.allocPrint(allocator, "generated/{s}.bin", .{self.module});
         defer allocator.free(filename);
+        info("outputting binary module {s} to {s}", .{ self.module, filename });
+
         const file = try std.Io.Dir.cwd().createFile(io, filename, .{ .truncate = true });
         defer file.close(io);
+
+        var buffer: [1024 * 5]u8 = undefined;
+        var out = file.writer(io, &buffer);
+        var writer = &out.interface;
+
         for (self.paragraphs.items) |paragraph| {
             //try file.writeAll(paragraph.words.items);
-            try file.writeAll(paragraph.text);
-            try file.writeAll("\n\n");
+            try writer.writeAll(paragraph.text);
+            try writer.writeAll("\n\n");
         }
-        return;
+        try writer.flush();
+        debug("generated {s}", .{filename});
     }
 };
 
 var vp_carry: ?Token = null;
 
-fn verse_paragrah_flipper(allocator: Allocator, reader: anytype) !Token {
-    const token = try reader.next(allocator);
+fn verse_paragrah_flipper(allocator: Allocator, io: std.Io, reader: anytype) !Token {
+    const token = try reader.next(allocator, io);
     if (vp_carry != null) {
         const t = vp_carry.?;
         vp_carry = null;
         return t;
     }
     if (token == .verse) {
-        const next = try reader.next(allocator);
+        const next = try reader.next(allocator, io);
         if (next == .paragraph) {
             vp_carry = token;
             return next;
@@ -189,7 +217,8 @@ fn verse_paragrah_flipper(allocator: Allocator, reader: anytype) !Token {
 }
 
 /// A paragraph is a small unit of text that belongs to a module.
-/// a paragraph consists of words that can be tagged.
+/// A paragraph contains of words that can be tagged. Verse numbers
+/// are attached to words in a paragraph.
 pub const Paragraph = struct {
     /// Base text of the paragraph.
     text: []const u8 = "",
@@ -280,19 +309,20 @@ pub fn extract_book_from_filename(filename: []const u8) praxis.Book {
     while (j < filename.len and filename[j] != '.' and filename[j] != '-')
         j += 1;
 
-    const info = praxis.Book.parse(filename[i..j]);
-    if (info.value == praxis.Book.unknown) {
+    const book_info = praxis.Book.parse(filename[i..j]);
+    if (book_info.value == praxis.Book.unknown) {
         err("Unable to convert filename {s} value {s} into book name.", .{
             filename,
             filename[i..j],
         });
     }
-    return info.value;
+    return book_info.value;
 }
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const err = std.log.err;
+const info = std.log.info;
 const debug = std.log.debug;
 
 const praxis = @import("praxis");

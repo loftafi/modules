@@ -1,10 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
 
-test {
-    const byz = @import("byzantine.zig");
-    std.testing.refAllDecls(byz);
+pub const Module = @import("module.zig").Module;
+pub const byzantine = @import("byzantine.zig");
+pub const nestle = @import("nestle.zig");
 
-    const nestle = @import("nestle.zig");
-    std.testing.refAllDecls(nestle);
+test {
+    std.testing.refAllDecls(@This());
 }

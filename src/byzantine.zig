@@ -698,7 +698,7 @@ const BetacodeType = praxis.BetacodeType;
 const parse_tag = praxis.byz.parse;
 const betacode_to_greek = praxis.betacode_to_greek;
 
-const modules = @import("modules.zig");
+const modules = @import("module.zig");
 const load_file_bytes = modules.load_file_bytes;
 const Token = modules.Token;
 const TokenType = modules.TokenType;

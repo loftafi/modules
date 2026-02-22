@@ -22,7 +22,7 @@ pub fn reader() type {
             allocator.free(self.data);
         }
 
-        pub fn next(self: *Self, _: Allocator) !Token {
+        pub fn next(self: *Self, _: Allocator, _: std.Io) !Token {
             return self.parser.next();
         }
 
@@ -373,7 +373,7 @@ test "test_parse_nestle_files" {
     defer p.deinit(allocator);
 
     while (true) {
-        const token = p.next(allocator) catch |e| {
+        const token = p.next(allocator, io) catch |e| {
             std.log.err("Failed parsing {s}. Error {any}", .{
                 @tagName(p.module()),
                 e,
@@ -400,7 +400,7 @@ const praxis = @import("praxis");
 const Reference = praxis.Reference;
 const parse_tag = praxis.byz.parse;
 
-const modules = @import("modules.zig");
+const modules = @import("module.zig");
 const Token = modules.Token;
 const load_file_bytes = modules.load_file_bytes;
 

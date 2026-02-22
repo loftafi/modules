@@ -9,6 +9,6 @@ pub fn ev(a: TokenType, b: Token) !Token {
 
 const std = @import("std");
 const err = std.log.err;
-const module = @import("modules.zig");
+const module = @import("module.zig");
 const Token = module.Token;
 const TokenType = module.TokenType;
