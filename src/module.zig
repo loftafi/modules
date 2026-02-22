@@ -1,17 +1,23 @@
+/// An arbitrarily large number of tokens that should be impossible to reach.
+/// If we hit this number the tokenizer is likly not performing correctly.
 pub const max_token_guard: usize = 10000000;
 
 /// A module is a sequence of paragraphs that we will display to a reader.
 pub const Module = struct {
     paragraphs: std.ArrayListUnmanaged(Paragraph) = .empty,
     verses: std.ArrayListUnmanaged(Verse) = .empty,
-    module: []const u8 = "",
+    module: []const u8,
 
+    /// An empty module to prepare for calling `read()`
+    pub const empty: Module = .{
+        .paragraphs = .empty,
+        .verses = .empty,
+        .module = "",
+    };
+
+    /// Initialise an empty module to prepare for calling `read()`
     pub fn init() Module {
-        return .{
-            .paragraphs = .empty,
-            .verses = .empty,
-            .module = "",
-        };
+        return .empty;
     }
 
     /// Fill the contents of this module using a custom `reader` that
