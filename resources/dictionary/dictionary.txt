@@ -33111,9 +33111,9 @@
   μῆλα|N-NPN|false|15169581||
   μήλου|N-GPN|false|5839546||
   μήλῳ|N-DPN|false|11327225||
-  μῆλα|N-APN|false|2034302||
-  μήλων|N-GPN|false|6340043||
-  μήλοις|N-DPN|false|13501685||
+  μῆλα|N-APN|false|2034302|en:apples:tree fruits|
+  μήλων|N-GPN|false|6340043|en:apples:tree fruits|
+  μήλοις|N-DPN|false|13501685|en:apples:tree fruits|
 μηλωτή|el|9692766|Noun|ἡ|-ῆς|3374|μηλωτ|en:sheepskin|||
   μηλωτή|N-NSF|false|2556092||
   μηλωτήν|N-ASF|false|5223215||
@@ -35095,6 +35095,8 @@
   ὀθόνια|N-APN|false|13806156||
   ὀθονίων|N-GPN|false|454106||
   ὀθονίοις|N-DPN|false|12064584||
+ο|el|13497276|Letter|||||en:omicron||alphabet|
+  ο||false|6608346|en:omicron|
 οἶδα|el|5785978|Verb|||1492|οἶδα|en:know:understand:remember#zh:知道#ru:знать:понимать|||
   εἰδήσουσιν|V-FAI-3P|false|2250641||
   οἶδα|V-RAI-1S|false|14746597||
@@ -48643,9 +48645,11 @@
   σωτηρίᾳ|N-DSF|false|134992||
   σωτηρίας|N-APF|false|134993||
 σωτήριος|el|101083|Adjective|||4992|σωτήρι|en:saving:bringing salvation:salvation|σωτήριος,,-ον||
-  σωτήριον|A-ASM|false|134997||
-  σωτήριος|A-NSF|false|134998||
-  σωτήριον|A-ASF|false|134999||
+  σωτήριος|A-NSM|false|134998||
+  σωτήριον|A-ASM|false|134999||
+  σωτηρίου|A-GSM|false|134997||
+  σωτηρίων|A-GPM|false|134998||
+  σωτήριοι|A-NPM|false|135000||
   σωτήριοι|A-NPF|false|135000||
   σωτήριον|A-NSN|false|135001||
   σωτήριον|A-ASN|false|135002||
