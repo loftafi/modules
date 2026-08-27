@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     modules.addImport("praxis", praxis_module);
 
     const cmd = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("cmd/main.zig"),
         .target = target,
         .optimize = optimize,
     });

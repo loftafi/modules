@@ -93,7 +93,7 @@ const print = std.debug.print;
 const praxis = @import("praxis");
 const Dictionary = praxis.Dictionary;
 
-const Module = @import("module.zig").Module;
-
-const byzantine = @import("byzantine.zig");
-const nestle = @import("nestle.zig");
+const modules = @import("modules");
+const Module = modules.Module;
+const byzantine = modules.byzantine;
+const nestle = modules.nestle;
