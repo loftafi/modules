@@ -316,13 +316,13 @@ pub fn extract_book_from_filename(filename: []const u8) praxis.Book {
         j += 1;
 
     const book_info = praxis.Book.parse(filename[i..j]);
-    if (book_info.value == praxis.Book.unknown) {
+    if (book_info == .unknown) {
         err("Unable to convert filename {s} value {s} into book name.", .{
             filename,
             filename[i..j],
         });
     }
-    return book_info.value;
+    return book_info;
 }
 
 const std = @import("std");

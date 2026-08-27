@@ -104,7 +104,7 @@ const NestleParser = struct {
             },
             3 => {
                 value = self.read_field();
-                const parsing = parse_tag(value) catch |f| {
+                const parsing = Byzantine.parse(value) catch |f| {
                     std.log.err("Faild parsing {s}. {any}", .{ value, f });
                     return .{ .invalid_token = value };
                 };
@@ -269,7 +269,7 @@ test "basic" {
         v = try ev(.word, try p.next());
         try expectEqualStrings("Βίβλος", v.word.word);
         v = try ev(.parsing, try p.next());
-        try ee(try parse_tag("N-NSF"), v.parsing);
+        try ee(try Byzantine.parse("N-NSF"), v.parsing);
         v = try ev(.strongs, try p.next());
         try ee(976, v.strongs[0]);
         try ee(39, v.strongs[1]);
@@ -286,7 +286,7 @@ test "basic" {
         v = try ev(.word, try p.next());
         try expectEqualStrings("Βίβλος", v.word.word);
         v = try ev(.parsing, try p.next());
-        try ee(try parse_tag("N-NSF"), v.parsing);
+        try ee(try Byzantine.parse("N-NSF"), v.parsing);
         v = try ev(.strongs, try p.next());
         try ee(976, v.strongs[0]);
         _ = try ev(.eof, try p.next());
@@ -302,7 +302,7 @@ test "basic" {
         v = try ev(.word, try p.next());
         try expectEqualStrings("ἀλλ᾽", v.word.word);
         v = try ev(.parsing, try p.next());
-        try ee(try parse_tag("CONJ"), v.parsing);
+        try ee(try Byzantine.parse("CONJ"), v.parsing);
         v = try ev(.strongs, try p.next());
         try expectEqual(235, v.strongs[0]);
         _ = try ev(.eof, try p.next());
@@ -327,7 +327,7 @@ test "basic" {
         v = try ev(.word, try p.next());
         try expectEqualStrings("Βίβλος", v.word.word);
         v = try ev(.parsing, try p.next());
-        try ee(try parse_tag("N-NSF"), v.parsing);
+        try ee(try Byzantine.parse("N-NSF"), v.parsing);
         v = try ev(.strongs, try p.next());
         try expectEqual(976, v.strongs[0]);
         v = try ev(.word, try p.next());
@@ -398,7 +398,7 @@ const Allocator = std.mem.Allocator;
 
 const praxis = @import("praxis");
 const Reference = praxis.Reference;
-const parse_tag = praxis.byz.parse;
+const Byzantine = praxis.Byzantine;
 
 const modules = @import("module.zig");
 const Token = modules.Token;

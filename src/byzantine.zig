@@ -185,7 +185,7 @@ const ByzParser = struct {
     original: []const u8 = "",
 
     /// Cache a greek betacode decoding
-    greek_buffer: praxis.BoundedArray(u8, praxis.max_word_size),
+    greek_buffer: [praxis.max_word_size]u8,
 
     /// Internal state tracking of variant markers.
     variant: u8 = 0,
@@ -199,7 +199,7 @@ const ByzParser = struct {
             .data = data,
             .original = data,
             .variant = 0,
-            .greek_buffer = .{ .len = 0 },
+            .greek_buffer = undefined,
             .current_reference = .{
                 .module = .byzantine,
                 .book = book,
@@ -273,21 +273,25 @@ const ByzParser = struct {
             }
             value.len = self.data.ptr - value.ptr;
 
-            self.greek_buffer.clear();
-            const greek = betacode_to_greek(value, .tlg, &self.greek_buffer) catch |e| {
+            var greek = Betacode.toGreek(value, .tlg, &self.greek_buffer) catch |e| {
                 std.log.err("invalid betacode {s}. {any}", .{ value, e });
                 return .{ .invalid_token = value };
             };
 
             // Add any leftover punctuation to the `value` but not the word.
             while (self.data.len > 0 and is_punctuation(self.data[0])) {
-                try self.greek_buffer.append(self.data[0]);
-                self.data = self.data[1..];
-                value.len += 1;
+                if (greek.len < self.greek_buffer.len) {
+                    self.greek_buffer[greek.len] = self.data[0];
+                    greek.len += 1;
+                    value.len += 1;
+                } else {
+                    std.log.err("invalid betacode {s}. Word+punctuation too long", .{greek});
+                    return .{ .invalid_token = value };
+                }
             }
 
             if (self.data.len == 0 or is_eol(self.data[0]) or is_ascii_whitespace(self.data[0])) {
-                return .{ .word = .{ .text = self.greek_buffer.slice(), .word = greek } };
+                return .{ .word = .{ .text = greek, .word = greek } };
             }
 
             return .{ .invalid_token = value[0 .. value.len + 1] };
@@ -331,7 +335,7 @@ const ByzParser = struct {
                 if (value.len == 1 and is_paragraph_tag(value[0])) {
                     return .paragraph;
                 }
-                const parsing = parse_tag(value) catch |e| {
+                const parsing = praxis.Byzantine.parse(value) catch |e| {
                     std.log.err("invalid parsing {s}. {any}", .{ value, e });
                     return .{ .invalid_token = value };
                 };
@@ -696,7 +700,7 @@ const Parsing = praxis.Parsing;
 const Reference = praxis.Reference;
 const BetacodeType = praxis.BetacodeType;
 const parse_tag = praxis.byz.parse;
-const betacode_to_greek = praxis.betacode_to_greek;
+const Betacode = praxis.Betacode;
 
 const modules = @import("module.zig");
 const load_file_bytes = modules.load_file_bytes;
