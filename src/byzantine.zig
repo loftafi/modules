@@ -1,6 +1,6 @@
 pub const folder = "resources/byzantine";
 
-pub const files = [_][]const u8{
+const files = [_][]const u8{
     "01_MAT", "02_MAR", "03_LUK", "04_JOH", "05_ACT", "06_ROM", "07_1CO",
     "08_2CO", "09_GAL", "10_EPH", "11_PHP", "12_COL", "13_1TH", "14_2TH",
     "15_1TI", "16_2TI", "17_TIT", "18_PHM", "19_HEB", "20_JAM", "21_1PE",
@@ -51,6 +51,7 @@ pub fn reader() type {
         pub fn deinit(self: *Self, allocator: Allocator) void {
             allocator.free(self.data);
             allocator.free(self.data2);
+            self.* = undefined;
         }
 
         // Read parser2 tokens for paragraph and accentation,
@@ -279,11 +280,13 @@ const ByzParser = struct {
             };
 
             // Add any leftover punctuation to the `value` but not the word.
+            const word_length = greek.len;
             while (self.data.len > 0 and is_punctuation(self.data[0])) {
                 if (greek.len < self.greek_buffer.len) {
                     self.greek_buffer[greek.len] = self.data[0];
                     greek.len += 1;
                     value.len += 1;
+                    self.data = self.data[1..];
                 } else {
                     std.log.err("invalid betacode {s}. Word+punctuation too long", .{greek});
                     return .{ .invalid_token = value };
@@ -291,7 +294,7 @@ const ByzParser = struct {
             }
 
             if (self.data.len == 0 or is_eol(self.data[0]) or is_ascii_whitespace(self.data[0])) {
-                return .{ .word = .{ .text = greek, .word = greek } };
+                return .{ .word = .{ .text = greek, .word = greek[0..word_length] } };
             }
 
             return .{ .invalid_token = value[0 .. value.len + 1] };
@@ -699,7 +702,7 @@ const praxis = @import("praxis");
 const Parsing = praxis.Parsing;
 const Reference = praxis.Reference;
 const BetacodeType = praxis.BetacodeType;
-const parse_tag = praxis.byz.parse;
+const parse_tag = praxis.Byzantine.parse;
 const Betacode = praxis.Betacode;
 
 const modules = @import("module.zig");

@@ -2,20 +2,21 @@
     .name = .modules,
     .version = "0.0.3",
     .fingerprint = 0x2eb743d7876c4857,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .praxis = .{
-            .url = "git+https://github.com/loftafi/praxis#10ebe8729b55819371300e8c0a7af1dfdd109fc5",
-            .hash = "praxis-0.11.0-FPf2NSoVBwB521F042YCPyq8-g-36lKO6ot8Z8v5tQAf",
+            .url = "git+https://github.com/loftafi/praxis?ref=0.18.0#157372a46a2f9445424c3f4dd1df9dc7e5947d83",
+            .hash = "praxis-0.18.0-FPf2Na0kCABpxt0r44OqQirHnLnxMxNwkQxamj2P9mqt",
         },
     },
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        "src",
         "README.md",
         "resources/dictionary/dictionary.txt",
         "resources/byzantine",
         "resources/nestle1904",
+        "src",
+        "cmd",
     },
 }

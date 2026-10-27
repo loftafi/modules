@@ -55,8 +55,8 @@ pub fn main(init: std.process.Init) !void {
     var arena = std.heap.ArenaAllocator.init(gpa);
     errdefer arena.deinit();
     var dictionary = try Dictionary.create(arena.allocator());
-    errdefer dictionary.destroy(arena.allocator());
-    try dictionary.loadFile(arena.allocator(), gpa, io, input_dictionary.?);
+    errdefer dictionary.destroy();
+    try dictionary.loadFile(gpa, io, input_dictionary.?);
 
     if (byzantine_read) {
         var module = Module.init();
