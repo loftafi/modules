@@ -53,22 +53,26 @@ pub fn main(init: std.process.Init) !void {
 
     // Load the dictionary of words before loading text modules
     var arena = std.heap.ArenaAllocator.init(gpa);
-    errdefer arena.deinit();
+    defer arena.deinit();
     var dictionary = try Dictionary.create(arena.allocator());
-    errdefer dictionary.destroy();
+    defer dictionary.destroy();
     try dictionary.loadFile(gpa, io, input_dictionary.?);
 
     if (byzantine_read) {
-        var module = Module.init();
+        var module: Module = .empty;
+        defer module.deinit(gpa);
         var byzantine_reader = try byzantine.reader().init(gpa, io, true);
+        defer byzantine_reader.deinit(gpa);
         try module.read(gpa, io, &byzantine_reader);
         try module.saveText(gpa, io);
         try module.saveBinary(gpa, io);
     }
 
     if (nestle_read) {
-        var module = Module.init();
+        var module: Module = .empty;
+        defer module.deinit(gpa);
         var nestle_reader = try nestle.reader().init(gpa, io, true);
+        defer nestle_reader.deinit(gpa);
         try module.read(gpa, io, &nestle_reader);
         try module.saveText(gpa, io);
         try module.saveBinary(gpa, io);

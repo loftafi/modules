@@ -27,10 +27,12 @@ pub fn reader() type {
 
             var filename = try bufPrint(&buf, "{s}.BP5", .{files[0]});
             const data = try load_file_bytes(allocator, io, dir, filename);
+            errdefer allocator.free(data);
             const parser = ByzParser.init(data, book);
 
             filename = try bufPrint(&buf, "{s}.TXT", .{files[0]});
             const data2 = try load_file_bytes(allocator, io, dir, filename);
+            errdefer allocator.free(data2);
             const parser2 = ByzParser.init(data2, book);
 
             if (verbose)
@@ -83,6 +85,7 @@ pub fn reader() type {
                 });
                 allocator.free(self.data);
                 self.data = try load_file_bytes(allocator, io, dir, filename);
+                errdefer allocator.free(self.data);
                 self.parser = ByzParser.init(self.data, book);
 
                 filename = try bufPrint(&buf, "{s}.TXT", .{
@@ -90,6 +93,7 @@ pub fn reader() type {
                 });
                 allocator.free(self.data2);
                 self.data2 = try load_file_bytes(allocator, io, dir, filename);
+                errdefer allocator.free(self.data2);
                 self.parser2 = ByzParser.init(self.data2, book);
 
                 debug("reading book {s}", .{@tagName(book)});

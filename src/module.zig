@@ -4,8 +4,12 @@ pub const max_token_guard: usize = 10000000;
 
 /// A module is a sequence of paragraphs that we will display to a reader.
 pub const Module = struct {
-    paragraphs: std.ArrayListUnmanaged(Paragraph) = .empty,
-    verses: std.ArrayListUnmanaged(Verse) = .empty,
+    /// A list of all paragraphs in the module, along with internal
+    /// verse number markers.
+    paragraphs: std.ArrayList(Paragraph) = .empty,
+
+    /// A list of all verses in the module.
+    verses: std.ArrayList(Verse) = .empty,
     module: []const u8,
 
     /// An empty module to prepare for calling `read()`
@@ -15,9 +19,12 @@ pub const Module = struct {
         .module = "",
     };
 
-    /// Initialise an empty module to prepare for calling `read()`
-    pub fn init() Module {
-        return .empty;
+    pub fn deinit(self: *Module, gpa: Allocator) void {
+        for (self.paragraphs.items) |*paragraph| {
+            paragraph.deinit(gpa);
+        }
+        self.paragraphs.deinit(gpa);
+        self.verses.deinit(gpa);
     }
 
     /// Fill the contents of this module using a custom `reader` that
@@ -28,9 +35,15 @@ pub const Module = struct {
         io: std.Io,
         reader: anytype,
     ) !void {
-        var paragraphs: std.ArrayListUnmanaged(Paragraph) = .empty;
-        var all_verses: std.ArrayListUnmanaged(Verse) = .empty;
-        var paragraph_verses: std.ArrayListUnmanaged(Verse) = .empty;
+        self.paragraphs.clearRetainingCapacity();
+        self.verses.clearRetainingCapacity();
+        errdefer self.paragraphs.clearRetainingCapacity();
+        errdefer self.verses.clearRetainingCapacity();
+
+        // Placeholder array for verse markers inside paragraphs.
+        var paragraph_verses: std.ArrayList(Verse) = .empty;
+        defer paragraph_verses.deinit(allocator);
+
         var text: std.Io.Writer.Allocating = .init(allocator);
         defer text.deinit();
 
@@ -56,7 +69,7 @@ pub const Module = struct {
             switch (t) {
                 .paragraph => {
                     if (text.written().len == 0) continue;
-                    try paragraphs.append(allocator, .{
+                    try self.paragraphs.append(allocator, .{
                         .text = try allocator.dupe(u8, text.written()),
                         .verses = paragraph_verses,
                         .words = .empty,
@@ -80,12 +93,12 @@ pub const Module = struct {
                     //try text.appendSlice(allocator, try reader.value());
                     try paragraph_verses.append(allocator, .{
                         .reference = t.verse,
-                        .paragraph = paragraphs.items.len,
+                        .paragraph = self.paragraphs.items.len,
                         .index = text.written().len,
                     });
-                    try all_verses.append(allocator, .{
+                    try self.verses.append(allocator, .{
                         .reference = t.verse,
-                        .paragraph = paragraphs.items.len,
+                        .paragraph = self.paragraphs.items.len,
                         .index = text.written().len,
                     });
                 },
@@ -107,11 +120,12 @@ pub const Module = struct {
                 },
                 .eof => {
                     if (text.written().len > 0) {
-                        try paragraphs.append(allocator, .{
+                        try self.paragraphs.append(allocator, .{
                             .text = try allocator.dupe(u8, text.written()),
                             .verses = paragraph_verses,
                             .words = .empty,
                         });
+                        paragraph_verses = .empty;
                     }
                     break;
                 },
@@ -128,13 +142,11 @@ pub const Module = struct {
             }
             token_count += 1;
         }
-        self.paragraphs = paragraphs;
-        self.verses = all_verses;
 
         debug("found {d} tokens, {d} paragraphs, {d} verses in {s} module data", .{
             token_count,
-            paragraphs.items.len,
-            all_verses.items.len,
+            self.paragraphs.items.len,
+            self.verses.items.len,
             @tagName(reader.module()),
         });
     }
@@ -230,10 +242,17 @@ pub const Paragraph = struct {
     text: []const u8 = "",
 
     /// A pointer to each word in the paragraph.
-    words: std.ArrayListUnmanaged(Word) = .empty,
+    words: std.ArrayList(Word) = .empty,
 
     /// List of verse markers that appear in this paragraph
-    verses: std.ArrayListUnmanaged(Verse) = .empty,
+    verses: std.ArrayList(Verse) = .empty,
+
+    pub fn deinit(self: *Paragraph, gpa: Allocator) void {
+        gpa.free(self.text);
+        self.words.deinit(gpa);
+        self.verses.deinit(gpa);
+        self.* = undefined;
+    }
 };
 
 /// A verse is a marker or bookmark into paragraphs of a module.
