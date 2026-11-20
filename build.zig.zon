@@ -2,11 +2,11 @@
     .name = .modules,
     .version = "0.0.3",
     .fingerprint = 0x2eb743d7876c4857,
-    .minimum_zig_version = "0.17.0",
+    .minimum_zig_version = "0.17.1",
     .dependencies = .{
         .praxis = .{
-            .url = "git+https://github.com/loftafi/praxis?ref=0.18.0#157372a46a2f9445424c3f4dd1df9dc7e5947d83",
-            .hash = "praxis-0.18.0-FPf2Na0kCABpxt0r44OqQirHnLnxMxNwkQxamj2P9mqt",
+            .url = "git+https://github.com/loftafi/praxis?ref=0.19.0#932ed6c7d9930db127b8d70c7cde4555ba6c897e",
+            .hash = "praxis-0.19.0-FPf2NYMsCAB1Z4laJey_Hfh5g5zXSmSeyflC4g4rmxjt",
         },
     },
     .paths = .{

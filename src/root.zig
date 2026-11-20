@@ -6,8 +6,8 @@ const std = @import("std");
 const testing = std.testing;
 
 pub const Module = @import("module.zig").Module;
-pub const byzantine = @import("byzantine.zig");
-pub const nestle = @import("nestle.zig");
+pub const Byzantine = @import("Byzantine.zig");
+pub const Nestle = @import("Nestle.zig");
 
 test {
     std.testing.refAllDecls(@This());

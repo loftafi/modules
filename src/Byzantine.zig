@@ -10,10 +10,10 @@ const files = [_][]const u8{
 pub fn reader() type {
     return struct {
         const Self = @This();
-        parser: ByzParser,
+        parser: Parser,
         original: []u8,
         data: []u8,
-        parser2: ByzParser,
+        parser2: Parser,
         data2: []u8,
         files_index: usize = 0,
         carryover_token: Token = .unknown,
@@ -28,12 +28,12 @@ pub fn reader() type {
             var filename = try bufPrint(&buf, "{s}.BP5", .{files[0]});
             const data = try load_file_bytes(allocator, io, dir, filename);
             errdefer allocator.free(data);
-            const parser = ByzParser.init(data, book);
+            const parser = Parser.init(data, book);
 
             filename = try bufPrint(&buf, "{s}.TXT", .{files[0]});
             const data2 = try load_file_bytes(allocator, io, dir, filename);
             errdefer allocator.free(data2);
-            const parser2 = ByzParser.init(data2, book);
+            const parser2 = Parser.init(data2, book);
 
             if (verbose)
                 debug("reading book {s}", .{@tagName(book)});
@@ -86,7 +86,7 @@ pub fn reader() type {
                 allocator.free(self.data);
                 self.data = try load_file_bytes(allocator, io, dir, filename);
                 errdefer allocator.free(self.data);
-                self.parser = ByzParser.init(self.data, book);
+                self.parser = Parser.init(self.data, book);
 
                 filename = try bufPrint(&buf, "{s}.TXT", .{
                     files[self.files_index],
@@ -94,7 +94,7 @@ pub fn reader() type {
                 allocator.free(self.data2);
                 self.data2 = try load_file_bytes(allocator, io, dir, filename);
                 errdefer allocator.free(self.data2);
-                self.parser2 = ByzParser.init(self.data2, book);
+                self.parser2 = Parser.init(self.data2, book);
 
                 debug("reading book {s}", .{@tagName(book)});
 
@@ -182,7 +182,7 @@ pub fn reader() type {
     };
 }
 
-const ByzParser = struct {
+const Parser = struct {
     /// This is a pointer to the data buffer that is advanced as we read.
     data: []const u8 = "",
 
@@ -199,7 +199,7 @@ const ByzParser = struct {
 
     /// Reads token from the input data byte array. The array may
     /// be destructively modified in the process of reading it.
-    pub fn init(data: []const u8, book: praxis.Book) ByzParser {
+    pub fn init(data: []const u8, book: praxis.Book) Parser {
         return .{
             .data = data,
             .original = data,
@@ -215,7 +215,7 @@ const ByzParser = struct {
         };
     }
 
-    pub fn next(self: *ByzParser) !Token {
+    pub fn next(self: *Parser) !Token {
         const lines = self.skip_space();
         if (lines > 1) {
             return .{ .paragraph = {} };
@@ -277,6 +277,11 @@ const ByzParser = struct {
                 self.data = self.data[1..];
             }
             value.len = self.data.ptr - value.ptr;
+
+            if (value.len > std.math.maxInt(u8)) {
+                std.log.err("word exceeds {d} bytes", .{std.math.maxInt(u8)});
+                return .{ .invalid_token = value };
+            }
 
             var greek = Betacode.toGreek(value, .tlg, &self.greek_buffer) catch |e| {
                 std.log.err("invalid betacode {s}. {any}", .{ value, e });
@@ -372,7 +377,7 @@ const ByzParser = struct {
     /// Pass over whitespace and comments. Return the number of lines skipped.
     /// two consecutive line endings might be considered a paragraph in some
     /// data files.
-    fn skip_space(self: *ByzParser) usize {
+    fn skip_space(self: *Parser) usize {
         var cr: usize = 0;
         var lf: usize = 0;
         while (self.data.len > 0) {
@@ -402,22 +407,22 @@ const ByzParser = struct {
         return @max(cr, lf);
     }
 
-    inline fn advance(self: *ByzParser) void {
+    inline fn advance(self: *Parser) void {
         self.data.len -= 1;
         self.data.ptr += 1;
     }
 
-    pub fn debug_slice(self: *ByzParser) []const u8 {
+    pub fn debug_slice(self: *Parser) []const u8 {
         if (self.data.len == 0) return "";
         const show = @min(20, self.data.len);
         return self.data[0..show];
     }
 };
 
-pub fn punctuation(word: Word) ?[]const u8 {
-    const trailing = word.text.len - word.word.len;
-    if (trailing == 0) return null;
-    return word.text[(word.text.len - trailing)..];
+pub fn punctuation(word: ImportedWord) ?[]const u8 {
+    if (word.word.len < word.text.len)
+        return word.text[word.word.len..];
+    return null;
 }
 
 fn is_ascii_whitespace(c: u8) bool {
@@ -463,18 +468,18 @@ fn is_paragraph_tag(c: u8) bool {
 }
 
 test "basic" {
-    var p = ByzParser.init(&"   22".*, .mark);
+    var p = Parser.init(&"   22".*, .mark);
     _ = try ev(.strongs, try p.next());
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"2  3".*, .mark);
+    p = Parser.init(&"2  3".*, .mark);
     var v = try ev(.strongs, try p.next());
     try ee(2, v.strongs[0]);
     v = try ev(.strongs, try p.next());
     try ee(3, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"22 2:3 0".*, .mark);
+    p = Parser.init(&"22 2:3 0".*, .mark);
     v = try ev(.strongs, try p.next());
     try ee(22, v.strongs[0]);
     v = try ev(.verse, try p.next());
@@ -484,14 +489,14 @@ test "basic" {
     try ee(0, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&" 2:2 \t \r\n 2:3 0 \n ".*, .mark);
+    p = Parser.init(&" 2:2 \t \r\n 2:3 0 \n ".*, .mark);
     _ = try ev(.verse, try p.next());
     _ = try ev(.verse, try p.next());
     v = try ev(.strongs, try p.next());
     try ee(0, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&" 2:2 \t \r\n  \n 2:3 0 \n ".*, .mark);
+    p = Parser.init(&" 2:2 \t \r\n  \n 2:3 0 \n ".*, .mark);
     _ = try ev(.verse, try p.next());
     _ = try ev(.paragraph, try p.next());
     _ = try ev(.verse, try p.next());
@@ -499,20 +504,20 @@ test "basic" {
     try ee(0, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&" 2:2,   ".*, .mark);
+    p = Parser.init(&" 2:2,   ".*, .mark);
     _ = try ev(.invalid_token, try p.next());
 
-    p = ByzParser.init(&" 22,   ".*, .mark);
+    p = Parser.init(&" 22,   ".*, .mark);
     _ = try ev(.invalid_token, try p.next());
 
-    p = ByzParser.init(&" 2: ".*, .mark);
+    p = Parser.init(&" 2: ".*, .mark);
     _ = try ev(.invalid_token, try p.next());
 
-    p = ByzParser.init(&"99 2: ".*, .mark);
+    p = Parser.init(&"99 2: ".*, .mark);
     _ = try ev(.strongs, try p.next());
     _ = try ev(.invalid_token, try p.next());
 
-    p = ByzParser.init(&"3:8 o logos 9 ".*, .mark);
+    p = Parser.init(&"3:8 o logos 9 ".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
     try es("ο", v.word.word);
@@ -522,7 +527,7 @@ test "basic" {
     try ee(9, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"3:8 o {N-NSM}".*, .mark);
+    p = Parser.init(&"3:8 o {N-NSM}".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
     try es("ο", v.word.word);
@@ -530,7 +535,7 @@ test "basic" {
     try ee(try parse_tag("N-NSM"), v.parsing);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"3:8 o {N-NSM} a".*, .mark);
+    p = Parser.init(&"3:8 o {N-NSM} a".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
     try es("ο", v.word.text);
@@ -540,13 +545,13 @@ test "basic" {
     try es("α", v.word.word);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"3:8 o {N-NSM".*, .mark);
+    p = Parser.init(&"3:8 o {N-NSM".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
     try es("ο", v.word.word);
     _ = try ev(.invalid_token, try p.next());
 
-    p = ByzParser.init(&"3:8 o | logos | logon | hn.".*, .mark);
+    p = Parser.init(&"3:8 o | logos | logon | hn.".*, .mark);
     _ = try ev(.verse, try p.next());
     _ = try ev(.word, try p.next());
     _ = try ev(.variant_mark, try p.next());
@@ -559,7 +564,7 @@ test "basic" {
     try es("ην.", v.word.text);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&
+    p = Parser.init(&
         \\1:1 {p} o 3739 {R-NSN} hn 1510 5707 {V-IAI-3S} ap 575 {PREP} archv 746
         \\{N-GSF} o 3739 {R-ASN} akhkoamen 191 5754 {V-2RAI-1P-ATT}
     .*, .mark);
@@ -569,7 +574,7 @@ test "basic" {
     _ = try ev(.strongs, try p.next());
 
     // Skip N and B annotations
-    p = ByzParser.init(&"BASILEU/EI E)PI\\ {N E)PI\\ > - } TH=S".*, .mark);
+    p = Parser.init(&"BASILEU/EI E)PI\\ {N E)PI\\ > - } TH=S".*, .mark);
     v = try ev(.word, try p.next());
     try es("βασιλεύει", v.word.word);
     //try es("BASILEU/EI", v.word.word);
@@ -581,7 +586,7 @@ test "basic" {
     try es("τῆς", v.word.word);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"12:23 *OU(=TOS HN E)N A)RXH=| O\\S O\\N QEO/N. ? ".*, .mark);
+    p = Parser.init(&"12:23 *OU(=TOS HN E)N A)RXH=| O\\S O\\N QEO/N. ? ".*, .mark);
     v = try ev(.verse, try p.next());
     _ = try ee(12, v.verse.chapter);
     _ = try ee(23, v.verse.verse);
@@ -596,7 +601,7 @@ test "basic" {
     _ = try ev(.eof, try p.next());
 
     // Skip N and B annotations
-    p = ByzParser.init(&
+    p = Parser.init(&
         \\02.01 teknia 5040 {N-VPN} mou 1473 {P-1GS} tauta 3778 {D-APN} 
         \\grafw 1125 {V-PAI-1S} umin 4771 {P-2DP} ina 2443 {CONJ}
     .*, .mark);
@@ -626,14 +631,14 @@ test "basic" {
     v = try ev(.parsing, try p.next());
     try ee(try parse_tag("P-2DP"), v.parsing);
 
-    p = ByzParser.init(&"A)NQRW/PWN,".*, .mark);
+    p = Parser.init(&"A)NQRW/PWN,".*, .mark);
     v = try ev(.word, try p.next());
     try es("ἀνθρώπων", v.word.word);
     try es("ἀνθρώπων,", v.word.text);
     try es(",", punctuation(v.word).?);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"O A)NQRW/PWN, ".*, .mark);
+    p = Parser.init(&"O A)NQRW/PWN, ".*, .mark);
     v = try ev(.word, try p.next());
     try ee(null, punctuation(v.word));
     v = try ev(.word, try p.next());
@@ -642,7 +647,7 @@ test "basic" {
     try es(",", punctuation(v.word).?);
     _ = try ev(.eof, try p.next());
 
-    p = ByzParser.init(&"KAT' O)/NAR E)FA/NH AU)TW=|,".*, .mark);
+    p = Parser.init(&"KAT' O)/NAR E)FA/NH AU)TW=|,".*, .mark);
     v = try ev(.word, try p.next());
     try es("κατ᾽", v.word.word);
     v = try ev(.word, try p.next());
@@ -694,7 +699,7 @@ test "test_parse_byzantine_files" {
 }
 
 const std = @import("std");
-const bufPrint = std.fmt.bufPrint;
+const bufPrint = std.mem.print;
 const BoundedArray = std.BoundedArray;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const warn = std.log.warn;
@@ -716,7 +721,7 @@ const TokenType = modules.TokenType;
 const Module = modules.Module;
 const Paragraph = modules.Paragraph;
 const Verse = modules.Verse;
-const Word = modules.Word;
+const ImportedWord = modules.ImportedWord;
 const extract_book_from_filename = modules.extract_book_from_filename;
 
 const ee = std.testing.expectEqual;

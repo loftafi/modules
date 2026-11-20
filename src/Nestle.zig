@@ -238,7 +238,7 @@ inline fn remove_punctuation(text: []const u8) []const u8 {
     while (word.len > 0 and is_punctuation(word[word.len - 1])) {
         word.len -= 1;
     }
-    return word;
+    return text[0..word.len];
 }
 
 fn is_ascii_whitespace(c: u8) bool {

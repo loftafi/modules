@@ -61,9 +61,9 @@ pub fn main(init: std.process.Init) !void {
     if (byzantine_read) {
         var module: Module = .empty;
         defer module.deinit(gpa);
-        var byzantine_reader = try byzantine.reader().init(gpa, io, true);
-        defer byzantine_reader.deinit(gpa);
-        try module.read(gpa, io, &byzantine_reader);
+        var reader = try Byzantine.reader().init(gpa, io, true);
+        defer reader.deinit(gpa);
+        try module.import(gpa, io, &reader);
         try module.saveText(gpa, io);
         try module.saveBinary(gpa, io);
     }
@@ -71,9 +71,9 @@ pub fn main(init: std.process.Init) !void {
     if (nestle_read) {
         var module: Module = .empty;
         defer module.deinit(gpa);
-        var nestle_reader = try nestle.reader().init(gpa, io, true);
-        defer nestle_reader.deinit(gpa);
-        try module.read(gpa, io, &nestle_reader);
+        var reader = try Nestle.reader().init(gpa, io, true);
+        defer reader.deinit(gpa);
+        try module.import(gpa, io, &reader);
         try module.saveText(gpa, io);
         try module.saveBinary(gpa, io);
     }
@@ -83,10 +83,10 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn help() void {
-    print("Specify a valid command.\n", .{});
-    print("  dictionary -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [byz] [nestle]\n", .{});
+    print("Specify a valid command:\n", .{});
+    print("  modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [byz] [nestle]\n", .{});
     print("\n", .{});
-    print("  dictionary -i resources/dictionary/dictionary.txt -o generated/dictionary.bin by \n", .{});
+    print("  modules -i resources/dictionary/dictionary.txt -o generated/dictionary.bin by \n", .{});
     print("\n", .{});
 }
 
@@ -99,5 +99,5 @@ const Dictionary = praxis.Dictionary;
 
 const modules = @import("modules");
 const Module = modules.Module;
-const byzantine = modules.byzantine;
-const nestle = modules.nestle;
+const Byzantine = modules.Byzantine;
+const Nestle = modules.Nestle;
