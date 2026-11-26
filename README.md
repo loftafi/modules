@@ -11,7 +11,7 @@ into the public domain. The [restricted](https://github.com/loftafi/modules/tree
 branch contains resources with licenses that impose restrictions on reuse
 and distribution such as the CC BY 4.0.
 
-### Design
+## Design
 
 The module reader accepts a standardised set of token types (word, verse
 marker, etc..) and outputs a standarised `.bin` file.
@@ -24,7 +24,21 @@ into the module reader.
           SBL reader                   byzantine.bin
 
 
-### License
+## Usage
+
+Command line usage:
+
+    modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [-byz folder] [-nestle folder]
+
+Generate a binary `dictionary.bin` module:
+
+    modules -i resources/dictionary/dictionary.txt -o generated/dictionary.bin
+
+Generate a `byzantine.bin` and `byzantine.txt` module in an `out` folder:
+
+    modules -i resources/dictionary/dictionary.txt -byz out
+
+## License
 
  - The code to build the binary files is public domain, under the MIT license.
  - For the data in each module, refer to the license information in each

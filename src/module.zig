@@ -166,12 +166,13 @@ pub const Module = struct {
         self: *Module,
         allocator: Allocator,
         io: std.Io,
+        folder: *std.Io.Dir,
     ) (Allocator.Error || std.Io.File.OpenError || std.Io.Writer.Error)!void {
-        const filename = try allocator.print("generated/{t}.txt", .{self.module});
+        const filename = try allocator.print("{t}.txt", .{self.module});
         defer allocator.free(filename);
         info("outputting text module {t} to {s}", .{ self.module, filename });
 
-        const file = try std.Io.Dir.cwd().createFile(io, filename, .{ .truncate = true });
+        const file = try folder.createFile(io, filename, .{ .truncate = true });
         defer file.close(io);
         var buffer: [1024 * 5]u8 = undefined;
         var out = file.writer(io, &buffer);
@@ -204,12 +205,13 @@ pub const Module = struct {
         self: *Module,
         allocator: Allocator,
         io: std.Io,
+        folder: *std.Io.Dir,
     ) (std.Io.Writer.Error||std.Io.File.OpenError||Allocator.Error)!void {
-        const filename = try allocator.print("generated/{t}.bin", .{self.module});
+        const filename = try allocator.print("{t}.bin", .{self.module});
         defer allocator.free(filename);
         info("outputting binary module {t} to {s}", .{ self.module, filename });
 
-        const file = try std.Io.Dir.cwd().createFile(io, filename, .{ .truncate = true });
+        const file = try folder.createFile(io, filename, .{ .truncate = true });
         defer file.close(io);
 
         var buffer: [1024 * 5]u8 = undefined;

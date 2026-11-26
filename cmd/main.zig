@@ -5,8 +5,8 @@ pub fn main(init: std.process.Init) !void {
     var input_dictionary: ?[]const u8 = null;
     var output_dictionary: ?[]const u8 = null;
     var mode: Dictionary.SaveMode = .all_words;
-    var byzantine_read: bool = false;
-    var nestle_read: bool = false;
+    var byzantine_out: ?[]const u8 = null;
+    var nestle_out: ?[]const u8 = null;
 
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -27,19 +27,25 @@ pub fn main(init: std.process.Init) !void {
             continue;
         }
         if (std.mem.eql(u8, arg, "--all_vocab")) {
-            mode = .gnt_words;
+            mode = .all_words;
             continue;
         }
         if (std.mem.eql(u8, arg, "--gnt_vocab")) {
             mode = .gnt_words;
             continue;
         }
-        if (std.mem.eql(u8, "byz", arg)) {
-            byzantine_read = true;
+        if (std.mem.eql(u8, "-byz", arg)) {
+            byzantine_out = args.next() orelse {
+                help();
+                return;
+            };
             continue;
         }
-        if (std.mem.eql(u8, "nestle", arg)) {
-            nestle_read = true;
+        if (std.mem.eql(u8, "-nestle", arg)) {
+            nestle_out = args.next() orelse {
+                help();
+                return;
+            };
             continue;
         }
         help();
@@ -58,35 +64,40 @@ pub fn main(init: std.process.Init) !void {
     defer dictionary.destroy();
     try dictionary.loadFile(gpa, io, input_dictionary.?);
 
-    if (byzantine_read) {
+    if (byzantine_out) |folder| {
+        var output_dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
+        defer output_dir.close(io);
         var module: Module = .empty;
         defer module.deinit(gpa);
         var reader = try Byzantine.reader().init(gpa, io, true);
         defer reader.deinit(gpa);
         try module.import(gpa, io, &reader);
-        try module.saveText(gpa, io);
-        try module.saveBinary(gpa, io);
+        try module.saveText(gpa, io, &output_dir);
+        try module.saveBinary(gpa, io, &output_dir);
     }
 
-    if (nestle_read) {
+    if (nestle_out) |folder| {
+        var output_dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
+        defer output_dir.close(io);
         var module: Module = .empty;
         defer module.deinit(gpa);
         var reader = try Nestle.reader().init(gpa, io, true);
         defer reader.deinit(gpa);
         try module.import(gpa, io, &reader);
-        try module.saveText(gpa, io);
-        try module.saveBinary(gpa, io);
+        try module.saveText(gpa, io, &output_dir);
+        try module.saveBinary(gpa, io, &output_dir);
     }
 
     if (output_dictionary) |out|
-        try dictionary.saveBinaryFile(arena.allocator(), io, .cwd(), out, .all_words);
+        try dictionary.saveBinaryFile(arena.allocator(), io, .cwd(), out, mode);
 }
 
 fn help() void {
     print("Specify a valid command:\n", .{});
-    print("  modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [byz] [nestle]\n", .{});
+    print("  modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [-byz outdir] [-nestle outdir]\n", .{});
     print("\n", .{});
-    print("  modules -i resources/dictionary/dictionary.txt -o generated/dictionary.bin by \n", .{});
+    print("  modules -i resources/dictionary/dictionary.txt -o generated/dictionary.bin\n", .{});
+    print("  modules -i resources/dictionary/dictionary.txt -byz generated \n", .{});
     print("\n", .{});
 }
 
