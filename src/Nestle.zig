@@ -400,7 +400,7 @@ const praxis = @import("praxis");
 const Reference = praxis.Reference;
 const Byzantine = praxis.Byzantine;
 
-const modules = @import("module.zig");
+const modules = @import("Module.zig");
 const Token = modules.Token;
 const load_file_bytes = modules.load_file_bytes;
 

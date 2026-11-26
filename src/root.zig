@@ -5,7 +5,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-pub const Module = @import("module.zig").Module;
+pub const Module = @import("Module.zig");
 pub const Byzantine = @import("Byzantine.zig");
 pub const Nestle = @import("Nestle.zig");
 

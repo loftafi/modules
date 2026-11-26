@@ -714,13 +714,13 @@ const BetacodeType = praxis.BetacodeType;
 const parse_tag = praxis.Byzantine.parse;
 const Betacode = praxis.Betacode;
 
-const modules = @import("module.zig");
+const modules = @import("Module.zig");
 const load_file_bytes = modules.load_file_bytes;
 const Token = modules.Token;
 const TokenType = modules.TokenType;
 const Module = modules.Module;
-const Paragraph = modules.Paragraph;
-const Verse = modules.Verse;
+const Paragraph = Module.Paragraph;
+const Verse = Module.Verse;
 const ImportedWord = modules.ImportedWord;
 const extract_book_from_filename = modules.extract_book_from_filename;
 
