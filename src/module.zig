@@ -34,13 +34,12 @@ pub const Module = struct {
     /// Fill the contents of this module using a custom `reader` that
     /// understands the data format of that content source.
     pub fn import(
-        self: *Module,
         allocator: Allocator,
         io: std.Io,
         reader: anytype,
-    ) !void {
-        self.module = reader.module();
-        debug("reading {t} module data", .{self.module});
+    ) !Module {
+        const module = reader.module();
+        debug("reading {t} module data", .{module});
 
         // Build a new paragraph list to overwrite into this module.
         var paragraphs: ArrayList(Paragraph) = .empty;
@@ -143,6 +142,7 @@ pub const Module = struct {
                             .verses = try verses.toOwnedSlice(allocator),
                             .words = try words.toOwnedSlice(allocator),
                         });
+                        text.clearRetainingCapacity();
                         verses = .empty;
                         words = .empty;
                     }
@@ -162,22 +162,21 @@ pub const Module = struct {
             token_count += 1;
         }
 
-        if (self.paragraphs.len > 0) {
-            allocator.free(self.paragraphs);
-        }
-        self.paragraphs = try paragraphs.toOwnedSlice(allocator);
-
-        if (self.verses.len > 0) {
-            allocator.free(self.verses);
-        }
-        self.verses = try all_verses.toOwnedSlice(allocator);
-
         debug("found {d} tokens, {d} paragraphs, {d} verses in {s} module data", .{
             token_count,
-            self.paragraphs.len,
-            self.verses.len,
+            paragraphs.items.len,
+            all_verses.items.len,
             @tagName(reader.module()),
         });
+
+        const p = try paragraphs.toOwnedSlice(allocator);
+        errdefer allocator.free(p);
+        const v = try all_verses.toOwnedSlice(allocator);
+        return .{
+            .module = module,
+            .paragraphs = p,
+            .verses = v,
+        };
     }
 
     /// Output a module in a plain human readable text format.
@@ -221,7 +220,7 @@ pub const Module = struct {
 
     /// Save the module in a binary format.
     pub fn saveBinary(
-        self: *Module,
+        self: *const Module,
         allocator: Allocator,
         io: std.Io,
         folder: *Dir,
@@ -245,7 +244,7 @@ pub const Module = struct {
 
     /// Write the module to a writer in binary format.
     fn writeBinary(
-        self: *Module,
+        self: *const Module,
         writer: *Writer,
     ) Writer.Error!void {
         var header: [6]u8 = undefined;
@@ -268,17 +267,19 @@ pub const Module = struct {
 
     /// Read a binary module file
     pub fn loadBinary(
-        self: *Module,
         gpa: Allocator,
         io: std.Io,
         file: *File,
-    ) (File.OpenError || Reader.Error || Error || Allocator.Error)!void {
+    ) (File.OpenError || Reader.Error || Error || Allocator.Error)!Module {
         var buffer: [1024 * 5]u8 = undefined;
         var reader = file.reader(io, &buffer);
-        try self.readBinary(gpa, &reader.interface);
+        return readBinary(gpa, &reader.interface);
     }
 
-    fn readBinary(self: *Module, gpa: Allocator, reader: *Reader) (Reader.Error || Error || Allocator.Error)!void {
+    fn readBinary(
+        gpa: Allocator,
+        reader: *Reader,
+    ) (Reader.Error || Error || Allocator.Error)!Module {
         var header: [6]u8 = undefined;
         try reader.readSliceAll(&header);
 
@@ -289,39 +290,32 @@ pub const Module = struct {
         const paragraph_counter: u32 = try reader.takeInt(u32, .little);
         if (paragraph_counter == 0) return Error.InvalidModuleData;
 
-        err("Reading version={d} module={t} paragraphs={d}", .{ version, module, paragraph_counter });
+        debug("Reading version={d} module={t} paragraphs={d}", .{ version, module, paragraph_counter });
 
-        var i:usize = 0;
-        var paragraphs: []Paragraph = try gpa.alloc(Paragraph, paragraph_counter);
-        errdefer {
-            for (0..i) |x| paragraphs[x].deinit(gpa);
-            gpa.free(paragraphs);
-        }
+        var i: usize = 0;
+        var verse_counter: usize = 0;
+        const paragraphs: []Paragraph = try gpa.alloc(Paragraph, paragraph_counter);
+        errdefer gpa.free(paragraphs);
+        errdefer for (0..i) |x| paragraphs[x].deinit(gpa);
         while (i < paragraph_counter) : (i += 1) {
-            //err("Reading paragraph no={d}", .{i});
-            paragraphs[i] = try Paragraph.readBinary(reader, gpa, module, @intCast(i));
+            paragraphs[i] = try Paragraph.readBinary(gpa, reader, module, @intCast(i));
+            verse_counter += paragraphs[i].verses.len;
+            //debug("read paragraph {d}/{d} {s}", .{ i, paragraph_counter, paragraphs[i].text });
         }
 
-        const verse_counter: u32 = try reader.takeInt(u32, .little);
         var verses: []Verse = try gpa.alloc(Verse, verse_counter);
         errdefer gpa.free(paragraphs);
         var index: usize = 0;
         for (paragraphs) |paragraph| {
-            @memcpy(verses[index..], paragraph.verses);
+            @memcpy(verses[index .. index + paragraph.verses.len], paragraph.verses);
             index += paragraph.verses.len;
         }
 
-        self.module = module;
-        if (self.paragraphs.len > 0) gpa.free(self.paragraphs);
-        self.paragraphs = paragraphs;
-
-        if (self.verses.len > 0) gpa.free(self.verses);
-        self.verses = try gpa.alloc(Verse, verse_counter);
-        i = 0;
-        for (self.paragraphs) |*p| {
-            @memcpy(self.verses[i .. i + p.verses.len], p.verses);
-            i += p.verses.len;
-        }
+        return .{
+            .module = module,
+            .paragraphs = paragraphs,
+            .verses = verses,
+        };
     }
 };
 
@@ -393,8 +387,8 @@ pub const Paragraph = struct {
     }
 
     pub fn readBinary(
-        reader: *Reader,
         gpa: Allocator,
+        reader: *Reader,
         module: praxis.Module,
         paragraph_counter: u32,
     ) (Reader.Error || Allocator.Error || Error)!Paragraph {
@@ -577,11 +571,10 @@ test "load_save_binary" {
     var folder = tmp_folder.dir;
 
     // Create a binary module
-    var module: Module = .empty;
-    defer module.deinit(gpa);
     var reader = try Byzantine.reader().init(gpa, io, true);
     defer reader.deinit(gpa);
-    try module.import(gpa, io, &reader);
+    var module = try Module.import(gpa, io, &reader);
+    defer module.deinit(gpa);
     try module.saveBinary(gpa, io, &folder);
 
     // Load the binary module
@@ -593,9 +586,8 @@ test "load_save_binary" {
     };
     defer file.close(io);
 
-    var module2: Module = .empty;
+    var module2 = try Module.loadBinary(gpa, io, &file);
     defer module2.deinit(gpa);
-    try module2.loadBinary(gpa, io, &file);
 
     // Check the re-loaded contents
     try expectEqual(module.paragraphs.len, module2.paragraphs.len);
