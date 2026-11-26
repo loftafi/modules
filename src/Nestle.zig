@@ -8,8 +8,12 @@ pub fn reader() type {
         parser: NestleParser,
         verbose: bool = false,
 
-        pub fn init(allocator: Allocator, io: std.Io, verbose: bool) !Self {
-            const dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
+        pub fn init(
+            allocator: Allocator,
+            io: std.Io,
+            verbose: bool,
+        ) (std.mem.PrintError || Dir.OpenError || Dir.ReadFileAllocError)!Self {
+            const dir = try Dir.cwd().openDir(io, folder, .{});
             const data = try load_file_bytes(allocator, io, dir, filename);
             return .{
                 .data = data,
@@ -22,7 +26,7 @@ pub fn reader() type {
             allocator.free(self.data);
         }
 
-        pub fn next(self: *Self, _: Allocator, _: std.Io) !Token {
+        pub fn next(self: *Self, _: Allocator, _: std.Io) Parsing.Error!Token {
             return self.parser.next();
         }
 
@@ -65,7 +69,7 @@ const NestleParser = struct {
         };
     }
 
-    pub fn next(self: *NestleParser) !Token {
+    pub fn next(self: *NestleParser) Parsing.Error!Token {
         _ = self.skip_space();
         if (self.data.len == 0) return .eof;
         var value = self.read_field();
@@ -395,10 +399,12 @@ test "test_parse_nestle_files" {
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Dir = std.Io.Dir;
 
 const praxis = @import("praxis");
 const Reference = praxis.Reference;
 const Byzantine = praxis.Byzantine;
+const Parsing = praxis.Parsing;
 
 const modules = @import("Module.zig");
 const Token = modules.Token;

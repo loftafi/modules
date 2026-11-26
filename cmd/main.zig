@@ -67,11 +67,10 @@ pub fn main(init: std.process.Init) !void {
     if (byzantine_out) |folder| {
         var output_dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
         defer output_dir.close(io);
-        var module: Module = .empty;
-        defer module.deinit(gpa);
         var reader = try Byzantine.reader().init(gpa, io, true);
         defer reader.deinit(gpa);
-        try module.import(gpa, io, &reader);
+        var module = try Module.import(gpa, io, &reader);
+        defer module.deinit(gpa);
         try module.saveText(gpa, io, &output_dir);
         try module.saveBinary(gpa, io, &output_dir);
     }
@@ -79,11 +78,10 @@ pub fn main(init: std.process.Init) !void {
     if (nestle_out) |folder| {
         var output_dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
         defer output_dir.close(io);
-        var module: Module = .empty;
-        defer module.deinit(gpa);
         var reader = try Nestle.reader().init(gpa, io, true);
         defer reader.deinit(gpa);
-        try module.import(gpa, io, &reader);
+        var module = try Module.import(gpa, io, &reader);
+        defer module.deinit(gpa);
         try module.saveText(gpa, io, &output_dir);
         try module.saveBinary(gpa, io, &output_dir);
     }

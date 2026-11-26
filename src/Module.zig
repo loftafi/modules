@@ -38,7 +38,7 @@ pub fn import(
     allocator: Allocator,
     io: std.Io,
     reader: anytype,
-) !Module {
+) (error{UnexpectedCharacter} || Dir.ReadFileAllocError || Allocator.Error || Writer.Error || praxis.Parsing.Error)!Module {
     const module = reader.module();
     debug("reading {t} module data", .{module});
 
@@ -326,7 +326,11 @@ pub const Error = error{
 
 var vp_carry: ?Token = null;
 
-fn verse_paragrah_flipper(allocator: Allocator, io: std.Io, reader: anytype) !Token {
+fn verse_paragrah_flipper(
+    allocator: Allocator,
+    io: std.Io,
+    reader: anytype,
+) (Dir.OpenError || Dir.ReadFileAllocError || Parsing.Error || Allocator.Error)!Token {
     const token = try reader.next(allocator, io);
     if (vp_carry != null) {
         const t = vp_carry.?;
@@ -523,7 +527,7 @@ pub fn load_file_bytes(
     io: std.Io,
     dir: Dir,
     filename: []const u8,
-) ![]u8 {
+) Dir.ReadFileAllocError![]u8 {
     return try dir.readFileAlloc(io, filename, allocator, .unlimited);
 }
 
@@ -609,3 +613,4 @@ const debug = std.log.debug;
 
 const praxis = @import("praxis");
 const Reference = praxis.Reference;
+const Parsing = praxis.Parsing;

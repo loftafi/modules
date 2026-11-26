@@ -19,9 +19,13 @@ pub fn reader() type {
         carryover_token: Token = .unknown,
         verbose: bool = false,
 
-        pub fn init(allocator: Allocator, io: std.Io, verbose: bool) !Self {
+        pub fn init(
+            allocator: Allocator,
+            io: std.Io,
+            verbose: bool,
+        ) (std.mem.PrintError || Dir.OpenError || Dir.ReadFileAllocError)!Self {
             var buf: [50]u8 = undefined;
-            const dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
+            const dir = try Dir.cwd().openDir(io, folder, .{});
 
             const book = extract_book_from_filename(files[0]);
 
@@ -58,7 +62,11 @@ pub fn reader() type {
 
         // Read parser2 tokens for paragraph and accentation,
         // supplimented by parser1 tokens for parsing data.
-        pub fn next(self: *Self, allocator: Allocator, io: std.Io) !Token {
+        pub fn next(
+            self: *Self,
+            allocator: Allocator,
+            io: std.Io,
+        ) (Parsing.Error || Dir.ReadFileAllocError)!Token {
             var token: Token = .{ .unknown = {} };
 
             if (self.carryover_token == .unknown) {
@@ -77,7 +85,7 @@ pub fn reader() type {
                 if (self.files_index >= files.len) return token;
 
                 var buf: [50]u8 = undefined;
-                const dir = try std.Io.Dir.cwd().openDir(io, folder, .{});
+                const dir = try Dir.cwd().openDir(io, folder, .{});
 
                 const book = extract_book_from_filename(files[self.files_index]);
                 var filename = try bufPrint(&buf, "{s}.BP5", .{
@@ -215,7 +223,7 @@ const Parser = struct {
         };
     }
 
-    pub fn next(self: *Parser) !Token {
+    pub fn next(self: *Parser) Parsing.Error!Token {
         const lines = self.skip_space();
         if (lines > 1) {
             return .{ .paragraph = {} };
@@ -706,6 +714,8 @@ const warn = std.log.warn;
 const err = std.log.err;
 const debug = std.log.debug;
 const Allocator = std.mem.Allocator;
+
+const Dir = std.Io.Dir;
 
 const praxis = @import("praxis");
 const Parsing = praxis.Parsing;
