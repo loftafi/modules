@@ -28,15 +28,19 @@ into the module reader.
 
 Command line usage:
 
-    modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [-byz folder] [-nestle folder]
+    modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab -m [module.bin] [-byz folder] [-nestle folder]
+
+Fetch the contents of a chapter or verse in a module:
+
+    modules -i path/dictionary.bin -m path/byzantine.bin search "john 1"
 
 Generate a binary `dictionary.bin` module:
 
-    modules -i resources/dictionary/dictionary.txt -o generated/dictionary.bin
+    modules -i path/dictionary.txt -o path/dictionary.bin
 
 Generate a `byzantine.bin` and `byzantine.txt` module in an `out` folder:
 
-    modules -i resources/dictionary/dictionary.txt -byz out
+    modules -i path/dictionary.txt -byz out
 
 ## License
 

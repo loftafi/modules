@@ -7,6 +7,8 @@ pub fn main(init: std.process.Init) !void {
     var mode: Dictionary.SaveMode = .all_words;
     var byzantine_out: ?[]const u8 = null;
     var nestle_out: ?[]const u8 = null;
+    var query_module: ?[]const u8 = null;
+    var query_string: ?[]const u8 = null;
 
     var args = init.minimal.args.iterate();
     _ = args.skip();
@@ -41,6 +43,13 @@ pub fn main(init: std.process.Init) !void {
             };
             continue;
         }
+        if (std.mem.eql(u8, "-m", arg)) {
+            query_module = args.next() orelse {
+                help();
+                return;
+            };
+            continue;
+        }
         if (std.mem.eql(u8, "-nestle", arg)) {
             nestle_out = args.next() orelse {
                 help();
@@ -48,11 +57,29 @@ pub fn main(init: std.process.Init) !void {
             };
             continue;
         }
+        if (std.mem.eql(u8, "search", arg)) {
+            query_string = args.next() orelse {
+                help();
+                return;
+            };
+            continue;
+        }
+
         help();
         return;
     }
 
     if (input_dictionary == null) {
+        help();
+        return;
+    }
+
+    if (query_string == null and query_module != null) {
+        help();
+        return;
+    }
+
+    if (query_string != null and query_module == null) {
         help();
         return;
     }
@@ -86,6 +113,33 @@ pub fn main(init: std.process.Init) !void {
         try module.saveBinary(gpa, io, &output_dir);
     }
 
+    if (query_string) |query| {
+        const ref = praxis.Reference.parse(query) catch |e| {
+            std.log.err("Invalid bible reference string. {t}", .{e});
+            return;
+        };
+
+        var file = std.Io.Dir.cwd().openFile(io, query_module.?, .{ .mode = .read_only }) catch |e| {
+            std.log.err("Error {t} opening module {s}", .{ e, query_module.? });
+            return e;
+        };
+        defer file.close(io);
+
+        var module = try Module.loadBinary(gpa, io, &file);
+        defer module.deinit(gpa);
+
+        var paragraph: ?u32 = null;
+        for (module.search(ref)) |verse| {
+            if (paragraph == null or verse.paragraph != paragraph.?) {
+                paragraph = verse.paragraph;
+                std.log.info("{s}", .{module.paragraphs[verse.paragraph].text});
+            }
+        }
+        if (paragraph == null) {
+            std.log.err("Search for '{s}' in {t} returned no data.", .{ query_string.?, module.module });
+        }
+    }
+
     if (output_dictionary) |out|
         try dictionary.saveBinaryFile(arena.allocator(), io, .cwd(), out, mode);
 }
@@ -94,6 +148,7 @@ fn help() void {
     print("Specify a valid command:\n", .{});
     print("  modules -i [intput_dictionary] -o [output_dictinary] --all_vocab --gnt_vocab [-byz outdir] [-nestle outdir]\n", .{});
     print("\n", .{});
+    print("  modules -i generated/dictionary.bin -m generated/byzantine.bin search \"john 1\"\n", .{});
     print("  modules -i resources/dictionary/dictionary.txt -o generated/dictionary.bin\n", .{});
     print("  modules -i resources/dictionary/dictionary.txt -byz generated \n", .{});
     print("\n", .{});

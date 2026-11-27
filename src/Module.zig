@@ -319,6 +319,20 @@ fn readBinary(
     };
 }
 
+/// Return the slice of verses that match a particular reference.
+pub fn search(self: *const Module, ref: Reference) []Verse {
+    var start: usize = 0;
+    while (start < self.verses.len) : (start += 1) {
+        if (ref.match(&self.verses[start].reference) != .gt) break;
+    }
+    if (start == self.verses.len) return &.{};
+    var end: usize = start;
+    while (end < self.verses.len) : (end += 1) {
+        if (ref.match(&self.verses[end].reference) != .eq) break;
+    }
+    return self.verses[start..end];
+}
+
 pub const Error = error{
     InvalidModuleVersion,
     InvalidModuleData,
