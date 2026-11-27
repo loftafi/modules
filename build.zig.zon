@@ -1,6 +1,6 @@
 .{
     .name = .modules,
-    .version = "0.2.0",
+    .version = "0.3.0",
     .fingerprint = 0x2eb743d7876c4857,
     .minimum_zig_version = "0.17.1",
     .dependencies = .{
