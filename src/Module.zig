@@ -60,8 +60,8 @@ pub fn import(
     var annotation_skip = false;
     while (true) {
         if (token_count > max_token_guard) break;
-        const t = verse_paragrah_flipper(allocator, io, reader) catch |e| {
-            std.log.err("Failed reading {s} module. '{s}' {any}", .{
+        const t = nextToken(allocator, io, reader) catch |e| {
+            err("Failed reading {s} module. '{s}' {any}", .{
                 @tagName(reader.module()),
                 reader.debug_slice(),
                 e,
@@ -153,7 +153,7 @@ pub fn import(
                 unreachable;
             },
             .invalid_token => {
-                std.log.err(
+                err(
                     "Failed reading {s} module. '{s}' invalid_token",
                     .{ @tagName(reader.module()), reader.debug_slice() },
                 );
@@ -338,14 +338,38 @@ pub const Error = error{
     InvalidModuleData,
 };
 
-var vp_carry: ?Token = null;
+var previous: ?Token = null;
+var next_carry: ?Token = null;
 
-fn verse_paragrah_flipper(
+/// Ensure all chapter markers are preceeded by a paragraph.
+fn nextToken(
     allocator: Allocator,
     io: std.Io,
     reader: anytype,
 ) (Dir.OpenError || Dir.ReadFileAllocError || Parsing.Error || Allocator.Error)!Token {
-    const token = try reader.next(allocator, io);
+    if (next_carry) |n| {
+        next_carry = null;
+        return n;
+    }
+    const next = try nextTokenParagraphOrdered(allocator, io, reader);
+    if (previous != null and previous.? != .paragraph and next == .verse and next.verse.verse == 1) {
+        next_carry = next;
+        previous = .{ .paragraph = {} };
+        return previous.?;
+    }
+    previous = next;
+    return next;
+}
+
+var vp_carry: ?Token = null;
+
+/// Ensure paragraph markers appear before their associated verse marker.
+fn nextTokenParagraphOrdered(
+    allocator: Allocator,
+    io: std.Io,
+    reader: anytype,
+) (Dir.OpenError || Dir.ReadFileAllocError || Parsing.Error || Allocator.Error)!Token {
+    const token:Token = try reader.next(allocator, io);
     if (vp_carry != null) {
         const t = vp_carry.?;
         vp_carry = null;
@@ -599,7 +623,7 @@ test "load_save_binary" {
     const filename = try gpa.print("{t}.bin", .{module.module});
     defer gpa.free(filename);
     var file = folder.openFile(io, filename, .{ .mode = .read_only }) catch |e| {
-        std.log.err("Error {t} opening {s}", .{ e, filename });
+        err("Error {t} opening {s}", .{ e, filename });
         return e;
     };
     defer file.close(io);
@@ -621,9 +645,9 @@ const Reader = std.Io.Reader;
 const Writer = std.Io.Writer;
 
 const expectEqual = std.testing.expectEqual;
-const err = std.log.err;
-const info = std.log.info;
-const debug = std.log.debug;
+const err = std.log.scoped(.modules).err;
+const info = std.log.scoped(.modules).info;
+const debug = std.log.scope(.modules).debug;
 
 const praxis = @import("praxis");
 const Reference = praxis.Reference;

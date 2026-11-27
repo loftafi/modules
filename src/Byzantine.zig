@@ -287,12 +287,12 @@ const Parser = struct {
             value.len = self.data.ptr - value.ptr;
 
             if (value.len > std.math.maxInt(u8)) {
-                std.log.err("word exceeds {d} bytes", .{std.math.maxInt(u8)});
+                err("word exceeds {d} bytes", .{std.math.maxInt(u8)});
                 return .{ .invalid_token = value };
             }
 
             var greek = Betacode.toGreek(value, .tlg, &self.greek_buffer) catch |e| {
-                std.log.err("invalid betacode {s}. {any}", .{ value, e });
+                err("invalid betacode {s}. {any}", .{ value, e });
                 return .{ .invalid_token = value };
             };
 
@@ -305,7 +305,7 @@ const Parser = struct {
                     value.len += 1;
                     self.data = self.data[1..];
                 } else {
-                    std.log.err("invalid betacode {s}. Word+punctuation too long", .{greek});
+                    err("invalid betacode {s}. Word+punctuation too long", .{greek});
                     return .{ .invalid_token = value };
                 }
             }
@@ -356,7 +356,7 @@ const Parser = struct {
                     return .paragraph;
                 }
                 const parsing = praxis.Byzantine.parse(value) catch |e| {
-                    std.log.err("invalid parsing {s}. {any}", .{ value, e });
+                    err("invalid parsing {s}. {any}", .{ value, e });
                     return .{ .invalid_token = value };
                 };
                 return .{ .parsing = parsing };
@@ -482,26 +482,26 @@ test "basic" {
 
     p = Parser.init(&"2  3".*, .mark);
     var v = try ev(.strongs, try p.next());
-    try ee(2, v.strongs[0]);
+    try expectEqual(2, v.strongs[0]);
     v = try ev(.strongs, try p.next());
-    try ee(3, v.strongs[0]);
+    try expectEqual(3, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"22 2:3 0".*, .mark);
     v = try ev(.strongs, try p.next());
-    try ee(22, v.strongs[0]);
+    try expectEqual(22, v.strongs[0]);
     v = try ev(.verse, try p.next());
-    try ee(2, v.verse.chapter);
-    try ee(3, v.verse.verse);
+    try expectEqual(2, v.verse.chapter);
+    try expectEqual(3, v.verse.verse);
     v = try ev(.strongs, try p.next());
-    try ee(0, v.strongs[0]);
+    try expectEqual(0, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&" 2:2 \t \r\n 2:3 0 \n ".*, .mark);
     _ = try ev(.verse, try p.next());
     _ = try ev(.verse, try p.next());
     v = try ev(.strongs, try p.next());
-    try ee(0, v.strongs[0]);
+    try expectEqual(0, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&" 2:2 \t \r\n  \n 2:3 0 \n ".*, .mark);
@@ -509,7 +509,7 @@ test "basic" {
     _ = try ev(.paragraph, try p.next());
     _ = try ev(.verse, try p.next());
     v = try ev(.strongs, try p.next());
-    try ee(0, v.strongs[0]);
+    try expectEqual(0, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&" 2:2,   ".*, .mark);
@@ -528,35 +528,35 @@ test "basic" {
     p = Parser.init(&"3:8 o logos 9 ".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
-    try es("ο", v.word.word);
+    try expectEqualStrings("ο", v.word.word);
     v = try ev(.word, try p.next());
-    try es("λογος", v.word.word);
+    try expectEqualStrings("λογος", v.word.word);
     v = try ev(.strongs, try p.next());
-    try ee(9, v.strongs[0]);
+    try expectEqual(9, v.strongs[0]);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"3:8 o {N-NSM}".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
-    try es("ο", v.word.word);
+    try expectEqualStrings("ο", v.word.word);
     v = try ev(.parsing, try p.next());
-    try ee(try parse_tag("N-NSM"), v.parsing);
+    try expectEqual(try parse_tag("N-NSM"), v.parsing);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"3:8 o {N-NSM} a".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
-    try es("ο", v.word.text);
+    try expectEqualStrings("ο", v.word.text);
     v = try ev(.parsing, try p.next());
-    try ee(try parse_tag("N-NSM"), v.parsing);
+    try expectEqual(try parse_tag("N-NSM"), v.parsing);
     v = try ev(.word, try p.next());
-    try es("α", v.word.word);
+    try expectEqualStrings("α", v.word.word);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"3:8 o {N-NSM".*, .mark);
     _ = try ev(.verse, try p.next());
     v = try ev(.word, try p.next());
-    try es("ο", v.word.word);
+    try expectEqualStrings("ο", v.word.word);
     _ = try ev(.invalid_token, try p.next());
 
     p = Parser.init(&"3:8 o | logos | logon | hn.".*, .mark);
@@ -568,8 +568,8 @@ test "basic" {
     _ = try ev(.word, try p.next());
     _ = try ev(.variant_end, try p.next());
     v = try ev(.word, try p.next());
-    try es("ην", v.word.word);
-    try es("ην.", v.word.text);
+    try expectEqualStrings("ην", v.word.word);
+    try expectEqualStrings("ην.", v.word.text);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&
@@ -584,20 +584,20 @@ test "basic" {
     // Skip N and B annotations
     p = Parser.init(&"BASILEU/EI E)PI\\ {N E)PI\\ > - } TH=S".*, .mark);
     v = try ev(.word, try p.next());
-    try es("βασιλεύει", v.word.word);
-    //try es("BASILEU/EI", v.word.word);
+    try expectEqualStrings("βασιλεύει", v.word.word);
+    //try expectEqualStrings("BASILEU/EI", v.word.word);
     v = try ev(.word, try p.next());
-    try es("ἐπὶ", v.word.text);
-    try es("ἐπὶ", v.word.word);
+    try expectEqualStrings("ἐπὶ", v.word.text);
+    try expectEqualStrings("ἐπὶ", v.word.word);
     v = try ev(.word, try p.next());
-    try es("τῆς", v.word.text);
-    try es("τῆς", v.word.word);
+    try expectEqualStrings("τῆς", v.word.text);
+    try expectEqualStrings("τῆς", v.word.word);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"12:23 *OU(=TOS HN E)N A)RXH=| O\\S O\\N QEO/N. ? ".*, .mark);
     v = try ev(.verse, try p.next());
-    _ = try ee(12, v.verse.chapter);
-    _ = try ee(23, v.verse.verse);
+    _ = try expectEqual(12, v.verse.chapter);
+    _ = try expectEqual(23, v.verse.verse);
     _ = try ev(.word, try p.next());
     _ = try ev(.word, try p.next());
     _ = try ev(.word, try p.next());
@@ -614,52 +614,52 @@ test "basic" {
         \\grafw 1125 {V-PAI-1S} umin 4771 {P-2DP} ina 2443 {CONJ}
     .*, .mark);
     v = try ev(.verse, try p.next());
-    try ee(2, v.verse.chapter);
-    try ee(1, v.verse.verse);
+    try expectEqual(2, v.verse.chapter);
+    try expectEqual(1, v.verse.verse);
     v = try ev(.word, try p.next());
-    try es("τεκνια", v.word.word);
+    try expectEqualStrings("τεκνια", v.word.word);
     _ = try ev(.strongs, try p.next());
     _ = try ev(.parsing, try p.next());
     v = try ev(.word, try p.next());
-    try es("μου", v.word.word);
+    try expectEqualStrings("μου", v.word.word);
     _ = try ev(.strongs, try p.next());
     _ = try ev(.parsing, try p.next());
     v = try ev(.word, try p.next());
-    try es("ταυτα", v.word.word);
+    try expectEqualStrings("ταυτα", v.word.word);
     _ = try ev(.strongs, try p.next());
     _ = try ev(.parsing, try p.next());
     v = try ev(.word, try p.next());
-    try es("γραφω", v.word.word);
+    try expectEqualStrings("γραφω", v.word.word);
     _ = try ev(.strongs, try p.next());
     v = try ev(.parsing, try p.next());
-    try ee(try parse_tag("V-PAI-1S"), v.parsing);
+    try expectEqual(try parse_tag("V-PAI-1S"), v.parsing);
     v = try ev(.word, try p.next());
-    try es("υμιν", v.word.word);
+    try expectEqualStrings("υμιν", v.word.word);
     _ = try ev(.strongs, try p.next());
     v = try ev(.parsing, try p.next());
-    try ee(try parse_tag("P-2DP"), v.parsing);
+    try expectEqual(try parse_tag("P-2DP"), v.parsing);
 
     p = Parser.init(&"A)NQRW/PWN,".*, .mark);
     v = try ev(.word, try p.next());
-    try es("ἀνθρώπων", v.word.word);
-    try es("ἀνθρώπων,", v.word.text);
-    try es(",", punctuation(v.word).?);
+    try expectEqualStrings("ἀνθρώπων", v.word.word);
+    try expectEqualStrings("ἀνθρώπων,", v.word.text);
+    try expectEqualStrings(",", punctuation(v.word).?);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"O A)NQRW/PWN, ".*, .mark);
     v = try ev(.word, try p.next());
-    try ee(null, punctuation(v.word));
+    try expectEqual(null, punctuation(v.word));
     v = try ev(.word, try p.next());
-    try es("ἀνθρώπων", v.word.word);
-    try es("ἀνθρώπων,", v.word.text);
-    try es(",", punctuation(v.word).?);
+    try expectEqualStrings("ἀνθρώπων", v.word.word);
+    try expectEqualStrings("ἀνθρώπων,", v.word.text);
+    try expectEqualStrings(",", punctuation(v.word).?);
     _ = try ev(.eof, try p.next());
 
     p = Parser.init(&"KAT' O)/NAR E)FA/NH AU)TW=|,".*, .mark);
     v = try ev(.word, try p.next());
-    try es("κατ᾽", v.word.word);
+    try expectEqualStrings("κατ᾽", v.word.word);
     v = try ev(.word, try p.next());
-    try es("ὄναρ", v.word.word);
+    try expectEqualStrings("ὄναρ", v.word.word);
 }
 
 test "test_parse_byzantine_files" {
@@ -673,7 +673,7 @@ test "test_parse_byzantine_files" {
     var ref: Reference = .unknown;
     while (true) {
         const token = p.next(allocator, io) catch |e| {
-            std.log.err("Failed parsing {any}. Error {any}", .{
+            err("Failed parsing {any}. Error {any}", .{
                 @tagName(p.module()),
                 e,
             });
@@ -694,7 +694,7 @@ test "test_parse_byzantine_files" {
             break;
         }
         if (.invalid_token == token) {
-            std.log.err("invalid token = '{s}' in book {s} char={d}", .{
+            err("invalid token = '{s}' in book {s} char={d}", .{
                 token.invalid_token,
                 @tagName(ref.book),
                 p.data.ptr - p.original.ptr,
@@ -710,9 +710,9 @@ const std = @import("std");
 const bufPrint = std.mem.print;
 const BoundedArray = std.BoundedArray;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
-const warn = std.log.warn;
-const err = std.log.err;
-const debug = std.log.debug;
+const warn = std.log.scoped(.modules).warn;
+const err = std.log.scoped(.modules).err;
+const debug = std.log.scoped(.modules).debug;
 const Allocator = std.mem.Allocator;
 
 const Dir = std.Io.Dir;
@@ -734,6 +734,6 @@ const Verse = Module.Verse;
 const ImportedWord = modules.ImportedWord;
 const extract_book_from_filename = modules.extract_book_from_filename;
 
-const ee = std.testing.expectEqual;
-const es = std.testing.expectEqualStrings;
+const expectEqual = std.testing.expectEqual;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const ev = @import("test.zig").ev;

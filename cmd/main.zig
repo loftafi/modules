@@ -129,10 +129,30 @@ pub fn main(init: std.process.Init) !void {
         defer module.deinit(gpa);
 
         var paragraph: ?u32 = null;
+        print("{s}\n\n", .{query_string.?});
         for (module.search(ref)) |verse| {
             if (paragraph == null or verse.paragraph != paragraph.?) {
                 paragraph = verse.paragraph;
-                std.log.info("{s}", .{module.paragraphs[verse.paragraph].text});
+                const p = module.paragraphs[verse.paragraph];
+                var v: usize = 0;
+                for (p.words) |word| {
+                    if (v < p.verses.len) {
+                        //print("{d}:{d} v={d} {d}//{d} {s}\n", .{
+                        //    p.verses[v].reference.chapter,
+                        //    p.verses[v].reference.verse,
+                        //    v,
+                        //    p.verses[v].index,
+                        //    word.text_start,
+                        //    word.text(p.text),
+                        //});
+                    }
+                    if (v < p.verses.len and p.verses[v].index + 1 == word.text_start) {
+                        print("[{d}] ", .{p.verses[v].reference.verse});
+                        v += 1;
+                    }
+                    print("{s} ", .{word.text(p.text)});
+                }
+                //std.log.info("{s}", .{module.paragraphs[verse.paragraph].text});
             }
         }
         if (paragraph == null) {
