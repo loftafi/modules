@@ -8,14 +8,14 @@ pub fn build(b: *std.Build) void {
     const praxis = b.dependency("praxis", .{});
     const praxis_module = praxis.module("praxis");
 
-    const modules = b.createModule(.{
+    const modules = b.addModule("modules", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
     modules.addImport("praxis", praxis_module);
 
-    const cmd = b.addModule("modules", .{
+    const cmd = b.createModule(.{
         .root_source_file = b.path("cmd/main.zig"),
         .target = target,
         .optimize = optimize,
