@@ -277,7 +277,7 @@ pub fn loadBinary(
     return readBinary(gpa, &reader.interface);
 }
 
-fn readBinary(
+pub fn readBinary(
     gpa: Allocator,
     reader: *Reader,
 ) (Reader.Error || Error || Allocator.Error)!Module {
