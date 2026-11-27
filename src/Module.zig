@@ -647,7 +647,7 @@ const Writer = std.Io.Writer;
 const expectEqual = std.testing.expectEqual;
 const err = std.log.scoped(.modules).err;
 const info = std.log.scoped(.modules).info;
-const debug = std.log.scope(.modules).debug;
+const debug = std.log.scoped(.modules).debug;
 
 const praxis = @import("praxis");
 const Reference = praxis.Reference;
